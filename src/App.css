@@ -689,6 +689,16 @@ button:disabled {
   fill: var(--text);
 }
 
+/* Bus used by the last step */
+.chip-bus.on {
+  stroke: var(--accent);
+  stroke-width: 5;
+}
+
+.chip-arrowhead.on {
+  fill: var(--accent);
+}
+
 .chip-pin rect,
 .chip-pin path {
   fill: var(--panel-bg);

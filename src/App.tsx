@@ -670,6 +670,7 @@ function App() {
                       : null
                   }
                   clockHz={clockHz}
+                  lastStep={canSimulate ? (historyView.rows[0] ?? null) : null}
                 />
               ),
             },

@@ -5,13 +5,16 @@
 // Coordinates follow the picture (1420 x 1180), so blocks can be compared with it.
 
 import type { CpuSnapshot } from "../simulator/cpu.ts";
+import type { HistoryEntry } from "../simulator/history.ts";
 import { portLevels } from "../simulator/pins.ts";
+import { activeBuses } from "../utils/chipPaths.ts";
 
 type ChipViewProps = {
   sim: CpuSnapshot | null; // null = nothing loaded: the diagram without values
   previous: CpuSnapshot | null; // before the last step, to highlight changes
   instruction: string | null; // the instruction the next step runs (Instruction Register)
   clockHz: number;
+  lastStep: HistoryEntry | null; // the step that led here: its buses light up
 };
 
 const TMR0 = 0x01;
@@ -107,23 +110,29 @@ function Box({ x, y, w, h, title = [], value, note, changed, inline }: BoxProps)
   );
 }
 
-// A bus / signal line with an arrow at the end (and at the start if both = true)
+// A bus / signal line with an arrow at the end (and at the start if both = true).
+// on = the last step used it: drawn in the accent colour.
 function Bus({
   d,
   both = false,
   label,
+  on = false,
+  arrow = true,
 }: {
   d: string;
   both?: boolean;
   label?: [number, number, string];
+  on?: boolean;
+  arrow?: boolean; // false: a plain line (e.g. the data bus trunk)
 }) {
+  const marker = !arrow ? undefined : on ? "url(#chip-arrow-on)" : "url(#chip-arrow)";
   return (
     <g>
       <path
-        className="chip-bus"
+        className={on ? "chip-bus on" : "chip-bus"}
         d={d}
-        markerEnd="url(#chip-arrow)"
-        markerStart={both ? "url(#chip-arrow)" : undefined}
+        markerEnd={marker}
+        markerStart={both ? marker : undefined}
       />
       {label && (
         <text className="chip-label" x={label[0]} y={label[1]}>
@@ -169,7 +178,8 @@ function Pin({
 
 // ---------- The diagram ----------
 
-export function ChipView({ sim, previous, instruction, clockHz }: ChipViewProps) {
+export function ChipView({ sim, previous, instruction, clockHz, lastStep }: ChipViewProps) {
+  const active = activeBuses(lastStep, previous, sim);
   // Value of a register now, and whether the last step changed it
   const reg = (address: number) => sim?.file[address];
   const changedReg = (address: number) =>
@@ -199,36 +209,62 @@ export function ChipView({ sim, previous, instruction, clockHz }: ChipViewProps)
           >
             <path className="chip-arrowhead" d="M0 0 L10 5 L0 10 z" />
           </marker>
+          <marker
+            id="chip-arrow-on"
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto-start-reverse"
+          >
+            <path className="chip-arrowhead on" d="M0 0 L10 5 L0 10 z" />
+          </marker>
         </defs>
 
         <rect className="chip-frame" x={8} y={8} width={1404} height={1164} />
 
         {/* ---------- Buses (drawn first, so the blocks cover their ends) ---------- */}
-        <Bus d="M360 77 H268" label={[318, 60, "13"]} />
-        <Bus d="M470 100 V166" both />
-        <Bus d="M970 68 H582" label={[700, 50, "Data Bus"]} />
-        <Bus d="M970 68 V858 H1022" label={[935, 745, "8"]} />
-        <Bus d="M745 68 V131" />
-        <Bus d="M970 202 H1008" />
-        <Bus d="M970 342 H1198" />
-        <Bus d="M1164 202 H1198" both />
-        <Bus d="M1284 318 V282" />
-        <Bus d="M180 257 V362" label={[58, 312, "Program Bus"]} />
+        <Bus on={active.has("pc-flash")} d="M360 77 H268" label={[318, 60, "13"]} />
+        <Bus on={active.has("pc-stack")} d="M470 100 V166" both />
+        {/* Data bus: the trunk, plus the branches to the PC (PCL) and to the I/O ports */}
+        <Bus
+          on={active.has("databus")}
+          d="M970 858 V68 H745"
+          arrow={false}
+          label={[935, 745, "8"]}
+        />
+        <Bus on={active.has("databus-pc")} d="M745 68 H582" label={[700, 50, "Data Bus"]} />
+        <Bus on={active.has("databus-io")} d="M970 858 H1022" />
+        <Bus on={active.has("databus-ram")} d="M745 68 V131" />
+        <Bus on={active.has("eedata")} d="M970 202 H1008" />
+        <Bus on={active.has("eeadr")} d="M970 342 H1198" />
+        <Bus on={active.has("eedata-eeprom")} d="M1164 202 H1198" both />
+        <Bus on={active.has("eeadr-eeprom")} d="M1284 318 V282" />
+        <Bus on={active.has("program-bus")} d="M180 257 V362" label={[58, 312, "Program Bus"]} />
         <text className="chip-label" x={192} y={322}>
           14
         </text>
-        <Bus d="M235 408 V465 H680 V397" label={[440, 450, "Direct Addr 5"]} />
-        <Bus d="M800 487 V397" label={[815, 440, "Indirect Addr 7"]} />
-        <Bus d="M745 355 V299" label={[760, 333, "RAM Addr 7"]} />
-        <Bus d="M970 508 H904" />
-        <Bus d="M904 573 H1019" both />
+        <Bus
+          on={active.has("direct-addr")}
+          d="M235 408 V465 H680 V397"
+          label={[440, 450, "Direct Addr 5"]}
+        />
+        <Bus
+          on={active.has("indirect-addr")}
+          d="M800 487 V397"
+          label={[815, 440, "Indirect Addr 7"]}
+        />
+        <Bus on={active.has("ram-addr")} d="M745 355 V299" label={[760, 333, "RAM Addr 7"]} />
+        <Bus on={active.has("databus-fsr")} d="M970 508 H904" />
+        <Bus on={active.has("databus-status")} d="M904 573 H1019" both />
         <Bus d="M180 408 V741" />
-        <Bus d="M180 625 H750 V668" label={[490, 610, "8"]} />
-        <Bus d="M970 625 H858 V668" />
-        <Bus d="M805 714 V761" />
-        <Bus d="M738 832 V896" />
-        <Bus d="M740 942 V985 H590 V735 H650 V761" />
-        <Bus d="M738 858 H970" />
+        <Bus on={active.has("literal")} d="M180 625 H750 V668" label={[490, 610, "8"]} />
+        <Bus on={active.has("databus-mux")} d="M970 625 H858 V668" />
+        <Bus on={active.has("mux-alu")} d="M805 714 V761" />
+        <Bus on={active.has("alu-w")} d="M738 832 V896" />
+        <Bus on={active.has("w-alu")} d="M740 942 V985 H590 V735 H650 V761" />
+        <Bus on={active.has("alu-databus")} d="M738 858 H970" />
         <Bus d="M263 797 H332" both />
         <Bus d="M263 922 H332" both />
         <Bus d="M176 979 V1023" both />
