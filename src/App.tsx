@@ -6,6 +6,7 @@ import { generateHex } from "./assembler/output/hex.ts";
 import { generateLst } from "./assembler/output/lst.ts";
 import { CodeEditor } from "./components/CodeEditor.tsx";
 import { FlashView } from "./components/FlashView.tsx";
+import { MemoryView } from "./components/MemoryView.tsx";
 import { MessagesView } from "./components/MessagesView.tsx";
 import { Panel } from "./components/Panel.tsx";
 import { RegistersView } from "./components/RegistersView.tsx";
@@ -15,6 +16,7 @@ import type { SimNote } from "./components/StatusBar.tsx";
 import { Toolbar } from "./components/Toolbar.tsx";
 import type { OutputFile } from "./components/Toolbar.tsx";
 import { MEMORY } from "./chip/config.ts";
+import { GPR_END, GPR_START } from "./chip/registers.ts";
 import { Cpu } from "./simulator/cpu.ts";
 import type { CpuSnapshot, StepResult } from "./simulator/cpu.ts";
 import { downloadText } from "./utils/download.ts";
@@ -101,6 +103,24 @@ function App() {
     ) {
       labelByAddress.set(symbol.value, name);
     }
+  }
+
+  // RAM address -> variable names (EQU / CBLOCK values inside general purpose RAM).
+  // Bank 1 addresses 0x8C-0xCF are the same bytes as 0x0C-0x4F.
+  const ramNames = new Map<number, string[]>();
+  for (const [name, symbol] of result?.symbols ?? []) {
+    if (symbol.kind !== "equ" && symbol.kind !== "cblock") continue;
+    const address = symbol.value >= 0x80 ? symbol.value - 0x80 : symbol.value;
+    if (address < GPR_START || address > GPR_END) continue;
+    ramNames.set(address, [...(ramNames.get(address) ?? []), name]);
+  }
+
+  // EEPROM address -> label names (labels on DE data at ORG 0x2100)
+  const eepromNames = new Map<number, string[]>();
+  for (const [name, symbol] of result?.symbols ?? []) {
+    const address = symbol.value - MEMORY.EEPROM_START;
+    if (symbol.kind !== "label" || address < 0 || address >= MEMORY.EEPROM_SIZE) continue;
+    eepromNames.set(address, [...(eepromNames.get(address) ?? []), name]);
   }
 
   const currentLine = canSimulate ? lineByAddress.get(sim.pc % MEMORY.PROGRAM_SIZE) : undefined;
@@ -226,11 +246,35 @@ function App() {
       </main>
 
       <div className="memory">
-        <Panel title="RAM" />
+        <Panel title="RAM">
+          {canSimulate ? (
+            <MemoryView
+              values={sim.file}
+              previous={previousSim?.file ?? null}
+              start={GPR_START}
+              end={GPR_END}
+              names={ramNames}
+            />
+          ) : (
+            <p className="todo">Assemble to load a program</p>
+          )}
+        </Panel>
         <Panel title="Flash">
           <FlashView result={result} onSelectLine={handleSelectLine} />
         </Panel>
-        <Panel title="EEPROM" />
+        <Panel title="EEPROM">
+          {canSimulate ? (
+            <MemoryView
+              values={sim.eeprom}
+              previous={previousSim?.eeprom ?? null}
+              start={0}
+              end={MEMORY.EEPROM_SIZE - 1}
+              names={eepromNames}
+            />
+          ) : (
+            <p className="todo">Assemble to load a program</p>
+          )}
+        </Panel>
         <Panel title="Messages">
           <MessagesView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
         </Panel>

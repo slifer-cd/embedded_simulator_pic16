@@ -42,6 +42,7 @@ export type CpuSnapshot = {
   cycles: number;
   sleeping: boolean;
   file: Uint8Array; // data memory by canonical address
+  eeprom: Uint8Array; // data EEPROM (64 bytes)
   stack: number[]; // valid return addresses, newest first
 };
 
@@ -76,6 +77,7 @@ export class Cpu {
       cycles: this.cycles,
       sleeping: this.sleeping,
       file: this.memory.file.slice(),
+      eeprom: this.memory.eeprom.slice(),
       stack: this.stack.entries(),
     };
   }

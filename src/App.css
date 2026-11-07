@@ -485,3 +485,67 @@ button:disabled {
 .stack-list li.changed .stack-address {
   color: var(--accent);
 }
+
+/* Memory grid (RAM / EEPROM) */
+.memview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.memview-grid {
+  border-collapse: collapse;
+}
+
+.memview-grid th {
+  padding: 0 4px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--text) 70%, transparent);
+}
+
+.memview-grid td {
+  padding: 0 3px;
+  text-align: center;
+  color: var(--text-h);
+  cursor: default;
+}
+
+/* Byte that belongs to a named variable */
+.memview-grid td.named {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.memview-vars {
+  border-collapse: collapse;
+}
+
+.memview-vars th {
+  padding: 1px 8px 1px 0;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.memview-vars td {
+  padding: 1px 8px 1px 0;
+}
+
+.memview-vars tr {
+  border-top: 1px solid var(--border);
+}
+
+.memview-addr,
+.memview-dec {
+  color: color-mix(in srgb, var(--text) 70%, transparent);
+}
+
+/* Byte changed by the last step */
+.memview .changed,
+.memview .changed td {
+  color: var(--accent);
+  font-weight: 700;
+  background: var(--current-line);
+}
