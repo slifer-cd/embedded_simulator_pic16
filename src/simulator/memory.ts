@@ -11,12 +11,14 @@
 import { MEMORY } from "../chip/config.ts";
 import { GPR_END, GPR_START, REGISTER_BY_NAME, REGISTERS } from "../chip/registers.ts";
 import { EepromController } from "./peripherals/eeprom.ts";
+import { Timer0 } from "./peripherals/timer0.ts";
 import { Pins, portLevels } from "./pins.ts";
 
 const address = (name: string) => REGISTER_BY_NAME.get(name)!.address;
 
 export const INDF = address("INDF");
 export const PCL = address("PCL");
+const TMR0 = address("TMR0");
 export const STATUS = address("STATUS");
 export const FSR = address("FSR");
 export const PCLATH = address("PCLATH");
@@ -54,6 +56,7 @@ export class Memory {
   readonly eeprom = new Uint8Array(MEMORY.EEPROM_SIZE); // data EEPROM
   readonly file = new Uint8Array(256); // data memory, indexed by canonical address
   readonly eepromController = new EepromController(this); // EECON1 / EECON2 behaviour
+  readonly timer0 = new Timer0(this); // TMR0 counting and prescaler
   readonly pins = new Pins(); // external pin drives (the outside world)
 
   constructor() {
@@ -74,6 +77,7 @@ export class Memory {
     this.file.fill(0);
     for (const reg of REGISTERS) this.file[reg.address] = reg.resetValue;
     this.eepromController.reset();
+    this.timer0.reset();
   }
 
   // ---------- Addressing ----------
@@ -122,6 +126,9 @@ export class Memory {
     const readOnly = READ_ONLY_BITS.get(where) ?? 0;
     const merged = (value & ~readOnly) | (this.file[where] & readOnly);
     this.file[where] = merged & (IMPLEMENTED_BITS.get(where) ?? 0xff);
+
+    // A write to TMR0 clears the prescaler and pauses Timer0 (see peripherals/timer0.ts)
+    if (where === TMR0) this.timer0.written();
   }
 
   // ---------- Direct access by full 8-bit address (UI and CPU internals) ----------

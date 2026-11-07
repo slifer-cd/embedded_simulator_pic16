@@ -6,7 +6,7 @@
 //   - a skip that is taken (DECFSZ, INCFSZ, BTFSC, BTFSS)
 //   - a write to PCL (e.g. ADDWF PCL, F for lookup tables)
 //
-// Not yet simulated: Timer0, interrupts, watchdog.
+// Not yet simulated: interrupts, watchdog.
 
 import { MEMORY } from "../chip/config.ts";
 import { decodeInstruction } from "../chip/instructions.ts";
@@ -135,6 +135,7 @@ export class Cpu {
 
     this.cycles += cycles;
     this.memory.eepromController.tick(cycles); // EEPROM write in progress finishes after ~4 ms
+    this.memory.timer0.tick(cycles); // not during SLEEP (above): the instruction clock stops
     const endlessLoop = instruction?.mnemonic === "GOTO" && this.pc === address;
     return { address, word, instruction, cycles, warnings, endlessLoop };
   }
