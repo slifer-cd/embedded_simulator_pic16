@@ -207,7 +207,8 @@ button:disabled {
   font-weight: 600;
 }
 
-.messages-outdated {
+/* "Code changed since the last assemble" hint (Messages, Flash) */
+.outdated-hint {
   margin: 0;
   padding: 4px 6px;
   border-left: 3px solid var(--warning);

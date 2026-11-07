@@ -4,6 +4,7 @@ import { disassemble } from "../chip/disassembler.ts";
 
 type FlashViewProps = {
   result: AssemblyResult | null; // null = not assembled yet
+  outdated: boolean; // code was edited after the last assemble
   onSelectLine: (line: number) => void; // click a row -> show its source line
 };
 
@@ -11,7 +12,7 @@ function hex(value: number, digits: number): string {
   return value.toString(16).toUpperCase().padStart(digits, "0");
 }
 
-export function FlashView({ result, onSelectLine }: FlashViewProps) {
+export function FlashView({ result, outdated, onSelectLine }: FlashViewProps) {
   if (!result) {
     return <p className="todo">Press Assemble</p>;
   }
@@ -32,6 +33,9 @@ export function FlashView({ result, onSelectLine }: FlashViewProps) {
 
   return (
     <div className="flash">
+      {outdated && (
+        <p className="outdated-hint">Code changed: this is the last assembled program.</p>
+      )}
       <p className="flash-summary">
         {words.length} / {MEMORY.PROGRAM_SIZE} words used
         {configWord && ` · Config ${hex(configWord.value, 4)}`}

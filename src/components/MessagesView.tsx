@@ -28,9 +28,7 @@ export function MessagesView({ result, outdated, onSelectLine }: MessagesViewPro
   return (
     <div className="messages">
       {outdated && (
-        <p className="messages-outdated">
-          Code changed since the last assemble. Press Assemble again.
-        </p>
+        <p className="outdated-hint">Code changed since the last assemble. Press Assemble again.</p>
       )}
 
       <p className={`messages-summary ${result.success ? "success" : "error"}`}>

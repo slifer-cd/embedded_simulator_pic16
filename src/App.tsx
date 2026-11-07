@@ -22,7 +22,7 @@ import { Cpu } from "./simulator/cpu.ts";
 import type { CpuSnapshot, StepResult } from "./simulator/cpu.ts";
 import type { Drive } from "./simulator/pins.ts";
 import { downloadText } from "./utils/download.ts";
-import { selectLine } from "./utils/selectLine.ts";
+import { scrollLineIntoView, selectLine } from "./utils/selectLine.ts";
 import "./App.css";
 
 const SAMPLE_CODE = `        LIST    P=16F84A
@@ -39,7 +39,7 @@ loop    GOTO    loop
         END
 `;
 
-const FILE_NAME = "program"; // base name for the output files
+const DEFAULT_FILE_NAME = "program"; // base name until a file is opened
 
 const CLOCK_HZ = 4_000_000; // oscillator frequency (4 MHz -> 1 µs per instruction cycle)
 const RUN_TICK_MS = 16; // how often the screen updates while running (~60 times a second)
@@ -58,6 +58,9 @@ function noteFor(step: StepResult, sleeping: boolean): SimNote | null {
 
 function App() {
   const [code, setCode] = useState(SAMPLE_CODE);
+  const [fileName, setFileName] = useState(DEFAULT_FILE_NAME); // base name for .asm/.hex/.lst/.err
+  const [savedCode, setSavedCode] = useState(SAMPLE_CODE); // code as last opened / saved
+  const unsaved = code !== savedCode;
   const [result, setResult] = useState<AssemblyResult | null>(null); // null = not assembled yet
   const [assembledCode, setAssembledCode] = useState(""); // the code the result was made from
 
@@ -78,16 +81,23 @@ function App() {
   // The result is out of date when the code was edited after the last assemble
   const outdated = result !== null && code !== assembledCode;
 
-  // Every file needs an up-to-date result; .hex also needs a build without errors
-  const upToDate = result !== null && !outdated;
-  const canDownload: Record<OutputFile, boolean> = {
-    hex: upToDate && result.success,
-    lst: upToDate,
-    err: upToDate,
+  // Why buttons are disabled (null = enabled), shown as their tooltip.
+  // .lst / .err need an up-to-date build; .hex and the simulator also need it without errors.
+  let buildProblem: string | null = null;
+  if (result === null) buildProblem = "Assemble the code first";
+  else if (outdated)
+    buildProblem = "The code changed since the last assemble: press Assemble again";
+  const errorProblem =
+    buildProblem ??
+    (result?.success ? null : "The build has errors: fix them first (see Messages)");
+  const downloadProblem: Record<OutputFile, string | null> = {
+    hex: errorProblem,
+    lst: buildProblem,
+    err: buildProblem,
   };
 
   // Simulation needs a successful build of the current code
-  const canSimulate = upToDate && result.success && sim !== null;
+  const canSimulate = errorProblem === null && sim !== null;
   const isRunning = running && canSimulate; // editing the code stops a running program
 
   // Program address -> source line, to highlight the next instruction in the editor
@@ -193,16 +203,39 @@ function App() {
     return () => clearInterval(id);
   }, [isRunning, cpu]);
 
+  // Keep the next instruction visible in the editor while stepping / running
+  useEffect(() => {
+    if (currentLine !== undefined && editorRef.current) {
+      scrollLineIntoView(editorRef.current, currentLine);
+    }
+  }, [currentLine]);
+
+  // Open an .asm file into the editor (asks first if the current code is not saved)
+  const handleOpen = async (file: File) => {
+    if (unsaved && !window.confirm("Replace the current code? Unsaved changes will be lost.")) {
+      return;
+    }
+    const text = (await file.text()).replace(/\r\n?/g, "\n"); // textarea uses "\n" only
+    setCode(text);
+    setSavedCode(text);
+    setFileName(file.name.replace(/\.[^.]*$/, "") || DEFAULT_FILE_NAME);
+  };
+
+  const handleSave = () => {
+    downloadText(`${fileName}.asm`, code);
+    setSavedCode(code);
+  };
+
   const handleDownload = (file: OutputFile) => {
     if (!result) return;
-    const asmName = `${FILE_NAME}.asm`;
+    const asmName = `${fileName}.asm`;
     const content =
       file === "hex"
         ? generateHex(result.words)
         : file === "lst"
           ? generateLst(result, asmName)
           : generateErr(result.messages, asmName);
-    downloadText(`${FILE_NAME}.${file}`, content);
+    downloadText(`${fileName}.${file}`, content);
   };
 
   const handleSelectLine = (line: number) => {
@@ -212,13 +245,15 @@ function App() {
   return (
     <div className="app">
       <Toolbar
+        onOpen={handleOpen}
+        onSave={handleSave}
         onAssemble={handleAssemble}
         onDownload={handleDownload}
-        canDownload={canDownload}
+        downloadProblem={downloadProblem}
         onRun={handleRun}
         onStep={handleStep}
         onReset={handleReset}
-        canSimulate={canSimulate}
+        simulateProblem={canSimulate ? null : (errorProblem ?? "Assemble the code first")}
         running={isRunning}
       />
 
@@ -230,7 +265,7 @@ function App() {
       />
 
       <main className="workspace">
-        <Panel title="Code">
+        <Panel title={`Code · ${fileName}.asm${unsaved ? " •" : ""}`}>
           <CodeEditor ref={editorRef} code={code} onChange={setCode} currentLine={currentLine} />
         </Panel>
 
@@ -270,7 +305,7 @@ function App() {
           )}
         </Panel>
         <Panel title="Flash">
-          <FlashView result={result} onSelectLine={handleSelectLine} />
+          <FlashView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
         </Panel>
         <Panel title="EEPROM">
           {canSimulate ? (
