@@ -1,15 +1,24 @@
 :root {
-  --text: #4b5563;
-  --text-h: #111827;
-  --bg: #f3f4f6;
-  --panel-bg: #ffffff;
-  --border: #d1d5db;
-  --code-bg: #f9fafb;
-  --error: #dc2626;
-  --warning: #d97706;
-  --success: #16a34a;
-  --accent: #2563eb;
-  --current-line: rgba(37, 99, 235, 0.14);
+  /* The three base colours. Light mode: ice background, obsidian text.
+     Dark mode flips them. Racing red is the accent in both.
+     (The previous blue/grey palette is in git: commit e606157.) */
+  --obsidian: #111217;
+  --ice: #dfe5eb;
+  --red: #ef233c;
+
+  --text: color-mix(in srgb, var(--obsidian) 78%, var(--ice));
+  --text-h: var(--obsidian);
+  --bg: var(--ice);
+  --panel-bg: color-mix(in srgb, var(--ice) 40%, white);
+  --border: color-mix(in srgb, var(--obsidian) 20%, var(--ice));
+  --code-bg: color-mix(in srgb, var(--ice) 65%, white);
+  --accent: var(--red);
+  --current-line: color-mix(in srgb, var(--red) 14%, transparent);
+
+  /* Status colours: kept apart from the accent so an error doesn't look like a highlight */
+  --error: #a50f24; /* darker crimson */
+  --warning: #b45309;
+  --success: #15803d;
 
   --sans: system-ui, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
@@ -22,17 +31,19 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #111217;
-    --panel-bg: #1a1b22;
-    --border: #2e303a;
-    --code-bg: #15161c;
-    --error: #f87171;
+    /* Like light mode, panels sit clearly apart from the page: here they are lighter */
+    --text: color-mix(in srgb, var(--ice) 78%, var(--obsidian));
+    --text-h: var(--ice);
+    --bg: var(--obsidian); /* #111217 */
+    --panel-bg: color-mix(in srgb, var(--obsidian) 87%, var(--ice)); /* ~#2c2e33 */
+    --border: color-mix(in srgb, var(--obsidian) 70%, var(--ice)); /* ~#4f5257 */
+    /* ~#1d1f24: editor background and row hover, between the page and the panels */
+    --code-bg: color-mix(in srgb, var(--obsidian) 94%, var(--ice));
+    --current-line: color-mix(in srgb, var(--red) 26%, transparent);
+
+    --error: #ff7a8a; /* lighter rose: readable on obsidian, still unlike the accent */
     --warning: #fbbf24;
     --success: #4ade80;
-    --accent: #60a5fa;
-    --current-line: rgba(96, 165, 250, 0.18);
   }
 }
 

@@ -269,11 +269,28 @@ function App() {
           <CodeEditor ref={editorRef} code={code} onChange={setCode} currentLine={currentLine} />
         </Panel>
 
-        <Panel title="Chip" />
-
         <Panel title="Registers">
           <RegistersView sim={canSimulate ? sim : null} previous={previousSim} />
         </Panel>
+
+        <div className="side">
+          <Panel title="RAM">
+            {canSimulate ? (
+              <MemoryView
+                values={sim.file}
+                previous={previousSim?.file ?? null}
+                start={GPR_START}
+                end={GPR_END}
+                names={ramNames}
+              />
+            ) : (
+              <p className="todo">Assemble to load a program</p>
+            )}
+          </Panel>
+          <Panel title="Pins">
+            <PinsView sim={canSimulate ? sim : null} previous={previousSim} onDrive={handleDrive} />
+          </Panel>
+        </div>
 
         <div className="side">
           <Panel title="Stack">
@@ -284,28 +301,15 @@ function App() {
               lineByAddress={lineByAddress}
             />
           </Panel>
-          <Panel title="Pins">
-            <PinsView sim={canSimulate ? sim : null} previous={previousSim} onDrive={handleDrive} />
+          <Panel title="Flash">
+            <FlashView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
           </Panel>
         </div>
       </main>
 
-      <div className="memory">
-        <Panel title="RAM">
-          {canSimulate ? (
-            <MemoryView
-              values={sim.file}
-              previous={previousSim?.file ?? null}
-              start={GPR_START}
-              end={GPR_END}
-              names={ramNames}
-            />
-          ) : (
-            <p className="todo">Assemble to load a program</p>
-          )}
-        </Panel>
-        <Panel title="Flash">
-          <FlashView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
+      <div className="bottom">
+        <Panel title="Messages">
+          <MessagesView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
         </Panel>
         <Panel title="EEPROM">
           {canSimulate ? (
@@ -320,9 +324,7 @@ function App() {
             <p className="todo">Assemble to load a program</p>
           )}
         </Panel>
-        <Panel title="Messages">
-          <MessagesView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
-        </Panel>
+        <Panel title="Chip" />
       </div>
     </div>
   );

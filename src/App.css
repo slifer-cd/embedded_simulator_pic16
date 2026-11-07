@@ -49,10 +49,11 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* Main area: code | chip | registers | stack + pins */
+/* Main area: code | registers | RAM + pins | stack + flash
+   (the last column is wider so Flash's four columns fit) */
 .workspace {
   display: grid;
-  grid-template-columns: 2fr 1.5fr 1.3fr 1fr;
+  grid-template-columns: 1.8fr 1.3fr 1.1fr 1.5fr;
   gap: 12px;
   /* Fixed height: long code or long lists scroll inside their panel instead of growing the page */
   height: max(360px, 55vh);
@@ -62,23 +63,32 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* Without this a grid cell grows to fit its content: a long Flash list would make
+     the column taller than the row. With it, the column keeps the row height and
+     each panel scrolls inside. */
+  min-height: 0;
 }
 
 .side .panel {
   flex: 1;
 }
 
-/* Bottom area: memory views */
-.memory {
+/* The lower panel of a column (Pins, Flash) has more rows: give it more height */
+.side .panel + .panel {
+  flex: 1.4;
+}
+
+/* Bottom area: messages | EEPROM | chip (Messages needs the width) */
+.bottom {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: 2fr 1.2fr 1fr;
   gap: 12px;
   min-height: 200px;
 }
 
 @media (max-width: 900px) {
   .workspace,
-  .memory {
+  .bottom {
     grid-template-columns: 1fr;
   }
 
@@ -89,6 +99,11 @@ button:disabled {
 
   .editor-wrap {
     height: 50vh;
+  }
+
+  /* No fixed row height here either: cap the side panels so a long Flash list scrolls */
+  .side .panel {
+    max-height: 60vh;
   }
 }
 
@@ -277,8 +292,10 @@ button:disabled {
   color: var(--text);
 }
 
-/* Flash panel */
+/* Flash panel: the summary stays put, the table fills the rest and scrolls */
 .flash {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -292,7 +309,8 @@ button:disabled {
 
 .flash-table {
   display: block;
-  max-height: 220px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   border-collapse: collapse;
   font-family: var(--mono);
