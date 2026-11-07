@@ -788,6 +788,35 @@ button:disabled {
   background: var(--current-line);
 }
 
+/* 7-segment display: dark body, dim segments, lit ones glow */
+.board-seg7 {
+  --led: #dc2626;
+  width: 46px;
+  height: 70px;
+}
+
+.board-seg7.green {
+  --led: #16a34a;
+}
+
+.board-seg7.yellow {
+  --led: #eab308;
+}
+
+.board-seg7-body {
+  fill: #1a1b22;
+}
+
+.board-seg7 polygon,
+.board-seg7 circle {
+  fill: color-mix(in srgb, var(--led) 15%, #1a1b22);
+}
+
+.board-seg7 .lit {
+  fill: var(--led);
+  filter: drop-shadow(0 0 2px var(--led));
+}
+
 .board-remove {
   position: absolute;
   top: -6px;

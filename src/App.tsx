@@ -31,7 +31,7 @@ import type { CpuSnapshot, StepResult } from "./simulator/cpu.ts";
 import type { Drive } from "./simulator/pins.ts";
 import { downloadText } from "./utils/download.ts";
 import { buttonLevel } from "./utils/board.ts";
-import type { BoardPart, NewBoardPart } from "./utils/board.ts";
+import type { BoardPart, ButtonPart, NewBoardPart } from "./utils/board.ts";
 import { moveBreakpoints } from "./utils/moveBreakpoints.ts";
 import {
   conditionHolds,
@@ -383,7 +383,7 @@ function App() {
     setBoardParts(boardParts.filter((p) => p.id !== id));
     if (part?.kind === "button") handleDrive(part.pin.port, part.pin.bit, null);
   };
-  const handlePress = (part: BoardPart, pressed: boolean) => {
+  const handlePress = (part: ButtonPart, pressed: boolean) => {
     handleDrive(part.pin.port, part.pin.bit, buttonLevel(part.activeLow, pressed));
   };
 

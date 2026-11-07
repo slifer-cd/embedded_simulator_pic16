@@ -10,7 +10,7 @@ A browser-based **PIC16F84A** assembler and simulator: a single-page app in Type
 - **Simulator**: all 35 instructions with pipeline-correct cycle counts, banked data memory, the 8-level stack, data EEPROM read/write, I/O pins, Timer0 (internal clock + prescaler, external clock on RA4/T0CKI), interrupts (TMR0, RB0/INT, RB4–RB7 change, EEPROM write complete), the watchdog, SLEEP wake-up and the power-on / MCLR / WDT reset types.
 - **UI**: editor with line numbers and a Chip tab (live block diagram, `components/ChipView.tsx`, drawn after `public/system.png`), Assemble / Run (with a speed setting) / Step Back / Step / Step Over / Step Out / Reset (power-on) / MCLR, a clock selector in the status bar, and panels for Messages, History / Breakpoints (tabs), Flash, Registers, Stack, RAM, EEPROM and Pins.
 
-Not built yet: a 7-segment display on the Board, a logic analyzer, a watch list, syntax highlighting (see `TODO.md`). `ideas.md` holds the approved feature list, the deferred EEPROM follow-ups and the planned order. `public/instructions.png` is the datasheet instruction table. `examples/` holds `.asm` programs for trying features by hand. `README.md` is still Vite template boilerplate.
+Not built yet: a logic analyzer, a watch list, syntax highlighting (see `TODO.md`). `ideas.md` holds the approved feature list, the deferred EEPROM follow-ups and the planned order. `public/instructions.png` is the datasheet instruction table. `examples/` holds `.asm` programs for trying features by hand. `README.md` is still Vite template boilerplate.
 
 ## Working agreement (set by the user)
 

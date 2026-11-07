@@ -6,6 +6,18 @@
 //           active low  = pull-up:   released -> pin reads 1, held -> 0
 //           active high = pull-down: released -> pin reads 0, held -> 1
 //         It drives the pin through the same "external drive" as the Pins panel.
+// 7-segment display: on PORTB, segments a-g on RB0-RB6 and the decimal point on RB7
+//         (the usual wiring). Common cathode: a 1 lights a segment; common anode: a 0.
+//
+//              a
+//            -----
+//         f |     | b
+//           |  g  |
+//            -----
+//         e |     | c
+//           |     |
+//            -----  . dp
+//              d
 
 export type PinRef = { port: "a" | "b"; bit: number };
 
@@ -14,9 +26,13 @@ export type LedColor = "red" | "green" | "yellow";
 // A part as the user describes it; BoardPart adds the id it gets on the board
 export type NewBoardPart =
   | { kind: "led"; pin: PinRef; activeLow: boolean; color: LedColor }
-  | { kind: "button"; pin: PinRef; activeLow: boolean };
+  | { kind: "button"; pin: PinRef; activeLow: boolean }
+  | { kind: "seg7"; activeLow: boolean; color: LedColor }; // activeLow = common anode
 
 export type BoardPart = NewBoardPart & { id: number };
+export type ButtonPart = Extract<BoardPart, { kind: "button" }>;
+
+export const SEGMENTS = ["a", "b", "c", "d", "e", "f", "g", "dp"] as const; // RB0 ... RB7
 
 // Every I/O pin, for the "on pin" dropdown
 export const BOARD_PINS: (PinRef & { name: string })[] = [
