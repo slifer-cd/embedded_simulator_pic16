@@ -56,6 +56,15 @@ function noteFor(step: StepResult, sleeping: boolean): SimNote | null {
   return null;
 }
 
+// Extra info shown after a single Step only (Run must not stop on every interrupt)
+function stepInfo(step: StepResult): SimNote | null {
+  if (step.interrupt) {
+    const address = step.address.toString(16).toUpperCase().padStart(4, "0");
+    return { kind: "info", text: `Interrupt after 0x${address}: GIE cleared, jumped to 0x0004.` };
+  }
+  return null;
+}
+
 function App() {
   const [code, setCode] = useState(SAMPLE_CODE);
   const [fileName, setFileName] = useState(DEFAULT_FILE_NAME); // base name for .asm/.hex/.lst/.err
@@ -161,7 +170,7 @@ function App() {
   const handleStep = () => {
     const step = cpu.step();
     showSnapshot(cpu.snapshot());
-    setSimNote(noteFor(step, cpu.sleeping));
+    setSimNote(noteFor(step, cpu.sleeping) ?? stepInfo(step));
   };
 
   const handleRun = () => {

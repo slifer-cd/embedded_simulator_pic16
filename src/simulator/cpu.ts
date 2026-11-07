@@ -6,7 +6,13 @@
 //   - a skip that is taken (DECFSZ, INCFSZ, BTFSC, BTFSS)
 //   - a write to PCL (e.g. ADDWF PCL, F for lookup tables)
 //
-// Not yet simulated: interrupts, watchdog.
+// Interrupts: after each instruction, if GIE = 1 and a source has its enable bit and
+// its flag set, the CPU pushes the PC (the return address), clears GIE (so the routine
+// is not interrupted again) and jumps to 0x0004. That costs 2 cycles here, like a CALL
+// (the real chip needs 3-4 cycles of latency). RETFIE pops the PC and sets GIE again.
+// Sources so far: TMR0 overflow (T0IE / T0IF).
+//
+// Not yet simulated: waking from SLEEP, watchdog.
 
 import { MEMORY } from "../chip/config.ts";
 import { decodeInstruction } from "../chip/instructions.ts";
@@ -25,15 +31,22 @@ const NOT_PD = 3;
 const NOT_TO = 4;
 
 const INTCON = 0x0b;
+// INTCON bits
 const GIE = 7;
+const T0IE = 5;
+const T0IF = 2;
+const ENABLE_BITS = 0x78; // EEIE, T0IE, INTE, RBIE (bits 6-3)
+
+const INTERRUPT_CYCLES = 2; // jump to the interrupt vector (see the comment at the top)
 
 export type StepResult = {
   address: number; // address of the instruction that ran
   word: number;
   instruction: Instruction | undefined; // undefined = not a valid instruction (ran as NOP)
-  cycles: number; // cycles this instruction took
+  cycles: number; // cycles this instruction took (+ the interrupt jump, if one happened)
   warnings: string[]; // e.g. stack overflow
-  endlessLoop: boolean; // a GOTO that jumped to itself ("GOTO $"): the program is "finished"
+  interrupt: boolean; // an interrupt happened after the instruction: PC = 0x0004
+  endlessLoop: boolean; // "GOTO $" with no interrupt that could get it out: the program is "finished"
 };
 
 // A copy of the CPU state at one moment, for the UI (the Cpu object itself keeps changing)
@@ -117,7 +130,15 @@ export class Cpu {
       // Nothing wakes the chip yet (watchdog / interrupts come later): time just passes
       this.cycles += 1;
       this.memory.eepromController.tick(1); // an EEPROM write keeps going during SLEEP
-      return { address, word, instruction, cycles: 1, warnings: ["Sleeping."], endlessLoop: false };
+      return {
+        address,
+        word,
+        instruction,
+        cycles: 1,
+        warnings: ["Sleeping."],
+        interrupt: false,
+        endlessLoop: false,
+      };
     }
 
     // Fetch: the PC already points to the next instruction while this one executes
@@ -133,11 +154,47 @@ export class Cpu {
       cycles += extra;
     }
 
+    this.passTime(cycles);
+
+    // Interrupt check, after the instruction (and after the peripherals set their flags)
+    const interrupt = this.interruptPending();
+    if (interrupt) {
+      const { overflow } = this.stack.push(this.pc); // pc = the next instruction: return there
+      if (overflow) warnings.push("Stack overflow: the oldest return address was lost.");
+      const intcon = this.memory.peek(INTCON);
+      this.memory.poke(INTCON, intcon & ~(1 << GIE));
+      this.setPc(MEMORY.INTERRUPT_VECTOR);
+      this.passTime(INTERRUPT_CYCLES);
+      cycles += INTERRUPT_CYCLES;
+    }
+
+    // GOTO $ only ends the program when no interrupt can get it out of the loop
+    // (with interrupts on it is the usual "wait for interrupts" loop)
+    const endlessLoop =
+      instruction?.mnemonic === "GOTO" && this.pc === address && !this.interruptsEnabled();
+    return { address, word, instruction, cycles, warnings, interrupt, endlessLoop };
+  }
+
+  // Cycles pass (not called during SLEEP: the instruction clock stops)
+  private passTime(cycles: number): void {
     this.cycles += cycles;
     this.memory.eepromController.tick(cycles); // EEPROM write in progress finishes after ~4 ms
-    this.memory.timer0.tick(cycles); // not during SLEEP (above): the instruction clock stops
-    const endlessLoop = instruction?.mnemonic === "GOTO" && this.pc === address;
-    return { address, word, instruction, cycles, warnings, endlessLoop };
+    this.memory.timer0.tick(cycles);
+  }
+
+  // GIE = 1 and at least one source is enabled: an interrupt can still come.
+  // Counts all enable bits, also those whose sources are not simulated yet (INTE, RBIE, EEIE).
+  private interruptsEnabled(): boolean {
+    const intcon = this.memory.peek(INTCON);
+    return ((intcon >> GIE) & 1) === 1 && (intcon & ENABLE_BITS) !== 0;
+  }
+
+  // GIE = 1 and some source has its enable bit and its flag set
+  private interruptPending(): boolean {
+    const intcon = this.memory.peek(INTCON);
+    if (((intcon >> GIE) & 1) === 0) return false;
+    const tmr0 = (intcon >> T0IE) & (intcon >> T0IF) & 1;
+    return tmr0 === 1;
   }
 
   // Runs one instruction; returns the extra cycles (taken skip / PCL write)

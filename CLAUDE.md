@@ -7,10 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A browser-based **PIC16F84A** assembler and simulator: a single-page app in TypeScript + React 19. Working today:
 
 - **Assembler** (MPASM-compatible syntax): two-pass, with `.hex` (INHX8M), `.lst` and `.err` downloads.
-- **Simulator**: all 35 instructions with pipeline-correct cycle counts, banked data memory, the 8-level stack, data EEPROM read/write, I/O pins, and Timer0 (internal clock + prescaler, external clock on RA4/T0CKI).
+- **Simulator**: all 35 instructions with pipeline-correct cycle counts, banked data memory, the 8-level stack, data EEPROM read/write, I/O pins, Timer0 (internal clock + prescaler, external clock on RA4/T0CKI), and interrupts (only the TMR0 source so far).
 - **UI**: editor with line numbers, Assemble / Run / Step / Reset, and panels for Messages, Flash, Registers, Stack, RAM, EEPROM and Pins.
 
-Not built yet: breakpoints, interrupts, the watchdog / SLEEP wake-up / reset types, a clock selector, and the chip SVG (`components/ChipView.tsx` is an empty placeholder). `ideas.md` holds the approved feature list, the deferred EEPROM follow-ups and the planned order. `public/instructions.png` is the datasheet instruction table. `examples/` holds `.asm` programs for trying features by hand. `README.md` is still Vite template boilerplate.
+Not built yet: breakpoints, the other interrupt sources (RB0/INT, RB4-RB7 change, EEPROM), the watchdog / SLEEP wake-up / reset types, a clock selector, and the chip SVG (`components/ChipView.tsx` is an empty placeholder). `ideas.md` holds the approved feature list, the deferred EEPROM follow-ups and the planned order. `public/instructions.png` is the datasheet instruction table. `examples/` holds `.asm` programs for trying features by hand. `README.md` is still Vite template boilerplate.
 
 ## Working agreement (set by the user)
 
@@ -61,7 +61,7 @@ MPASM behaviours that are easy to trip over:
 - **`memory.ts`**: data memory is `file[256]` indexed by a **canonical address**. A table maps all 256 addresses, so mirrored registers and the 68 GPR bytes are stored once, and unimplemented addresses map to `null`. `read`/`write` take an instruction's 7-bit `f` (RP0 banking, INDF → FSR) and apply the read-only and implemented-bit masks. `peek`/`poke` take a full address and skip those rules (used by the CPU for flags and by the UI). Writes to EECON1/EECON2 go to `peripherals/eeprom.ts`.
 - **PORTA/PORTB:** `file[]` holds the **output latches**, while `peek`/`read` return **pin levels** computed by `pins.ts` from TRIS, the latches, OPTION (weak pull-ups) and the external drives the user sets. RA4 is open-drain.
 - **`cpu.ts`:** `step()` advances the PC **before** executing (so `ADDWF PCL, F` tables work), adds +1 cycle for taken skips and PCL writes, sets flags **after** storing the result (so `CLRF STATUS` gives Z = 1), and ticks the EEPROM controller and Timer0 (not during SLEEP).
-- **`peripherals/timer0.ts`:** `tick()` runs **after** the instruction, so the 2-cycle pause after a TMR0 write (`written()`, called from `Memory.write`) includes the writing instruction's own cycle; that matches datasheet Figure 5-2. The external clock checks the RA4 pin level once per instruction. It returns warnings (stack over/underflow, invalid opcode) and `endlessLoop` (a `GOTO $`).
+- **`peripherals/timer0.ts`:** `tick()` runs **after** the instruction, so the 2-cycle pause after a TMR0 write (`written()`, called from `Memory.write`) includes the writing instruction's own cycle; that matches datasheet Figure 5-2. The external clock checks the RA4 pin level once per instruction. After the instruction and the peripheral ticks it checks for an interrupt (`interruptPending()`: GIE + enable bit + flag), which pushes the PC, clears GIE and jumps to `0x0004` (2 cycles). It returns warnings (stack over/underflow, invalid opcode), `interrupt`, and `endlessLoop` (a `GOTO $` while no interrupt is enabled).
 - **`snapshot()`:** copies the state for React. The `Cpu` object itself keeps changing.
 
 ### `App.tsx` state model
@@ -69,7 +69,7 @@ MPASM behaviours that are easy to trip over:
 - `result` + `assembledCode`: `outdated` (code edited since the last assemble) disables downloads and simulation.
 - **The CPU:** one `Cpu`, created once with `useState(() => new Cpu())` and changed in event handlers.
 - **Snapshots:** the UI only renders snapshots, kept as `{ now, before }`, so panels can highlight what the last step changed. Load and Reset set `before: null`.
-- **Run:** a `useEffect` + `setInterval` that executes `STEPS_PER_TICK` instructions per tick. It stops on any `noteFor()` result (a warning, `GOTO $` or SLEEP).
+- **Run:** a `useEffect` + `setInterval` that executes `STEPS_PER_TICK` instructions per tick. It stops on any `noteFor()` result (a warning, `GOTO $` or SLEEP). `stepInfo()` notes (an interrupt happened) are shown after a single Step only, so they don't stop Run.
 
 ## Conventions enforced by config
 

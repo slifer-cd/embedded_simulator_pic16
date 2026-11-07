@@ -10,13 +10,14 @@ What is left to build, in planned order. See `ideas.md` for the full list of app
 - Editor: line numbers, Tab / Shift+Tab, current-line highlight that stays in view
 - Open / Save `.asm`, tooltips that explain disabled buttons, up-to-date `CLAUDE.md`
 - Timer0: internal clock with prescaler, external clock on RA4/T0CKI, T0IF on overflow, TMR0 write clears the prescaler and pauses 2 cycles
+- Interrupts: mechanism (push PC, clear GIE, jump to `0x004`, 2 cycles) + TMR0 interrupt; `GOTO $` ends Run only when no interrupt can come
 - UI: new panel layout (simulator panels on top), obsidian / ice grey / racing red colours
 
 ## Simulator features (in planned order)
 
 - [x] **1. Timer0, internal clock**: TMR0, prescaler (PSA, PS2:0), T0IF on overflow; a write clears the prescaler and pauses counting 2 cycles; stops in SLEEP
 - [x] **2. Timer0, external clock**: count edges on RA4/T0CKI (T0SE picks rising / falling)
-- [ ] **3. Interrupt mechanism + TMR0 interrupt**: GIE / enable bit / flag → push PC, clear GIE, jump to `0x004`; RETFIE. Run should stop at `GOTO $` only when GIE = 0
+- [x] **3. Interrupt mechanism + TMR0 interrupt**: GIE / enable bit / flag → push PC, clear GIE, jump to `0x004`; RETFIE. Run should stop at `GOTO $` only when GIE = 0
 - [ ] **4. The other interrupt sources**: RB0/INT (INTEDG), RB4–RB7 change, EEPROM write complete (EEIE)
 - [ ] **5. Watchdog + SLEEP wake-up + reset types**: WDT is on by default in the config word; MCLR / WDT resets; TO / PD bits; WRERR; an MCLR button
 - [ ] **6. Clock selector**: replaces the fixed 4 MHz; the EEPROM write time follows it
