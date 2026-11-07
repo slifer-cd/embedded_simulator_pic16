@@ -10,6 +10,7 @@
 
 import { MEMORY } from "../chip/config.ts";
 import { GPR_END, GPR_START, REGISTER_BY_NAME, REGISTERS } from "../chip/registers.ts";
+import { EepromController } from "./peripherals/eeprom.ts";
 
 const address = (name: string) => REGISTER_BY_NAME.get(name)!.address;
 
@@ -18,6 +19,7 @@ export const PCL = address("PCL");
 export const STATUS = address("STATUS");
 export const FSR = address("FSR");
 export const PCLATH = address("PCLATH");
+const EECON1 = address("EECON1");
 const EECON2 = address("EECON2");
 
 const RP0_BIT = 5;
@@ -48,6 +50,7 @@ export class Memory {
   readonly program = new Uint16Array(MEMORY.PROGRAM_SIZE); // flash, 14-bit words
   readonly eeprom = new Uint8Array(MEMORY.EEPROM_SIZE); // data EEPROM
   readonly file = new Uint8Array(256); // data memory, indexed by canonical address
+  readonly eepromController = new EepromController(this); // EECON1 / EECON2 behaviour
 
   constructor() {
     this.program.fill(MEMORY.WORD_MASK); // blank flash = 0x3FFF
@@ -66,6 +69,7 @@ export class Memory {
   reset(): void {
     this.file.fill(0);
     for (const reg of REGISTERS) this.file[reg.address] = reg.resetValue;
+    this.eepromController.reset();
   }
 
   // ---------- Addressing ----------
@@ -98,7 +102,18 @@ export class Memory {
 
   write(f: number, value: number): void {
     const where = this.target(f);
-    if (where === null || where === EECON2) return; // EECON2 has no storage (EEPROM unlock: later step)
+    if (where === null) return;
+
+    // EEPROM control registers have special behaviour (see peripherals/eeprom.ts)
+    if (where === EECON2) {
+      this.eepromController.writeEecon2(value & 0xff); // no storage: unlock sequence only
+      return;
+    }
+    if (where === EECON1) {
+      const old = this.file[EECON1];
+      this.file[EECON1] = this.eepromController.writeEecon1(old, value & 0xff) & 0x1f;
+      return;
+    }
 
     const readOnly = READ_ONLY_BITS.get(where) ?? 0;
     const merged = (value & ~readOnly) | (this.file[where] & readOnly);

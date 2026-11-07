@@ -58,3 +58,22 @@ When the user asks, the assembler generates these MPASM-style files:
 19. **Watch list**: pin chosen registers or variables (by label) to watch.
 20. **Example programs**: blink an LED, button input, Timer0 interrupt, EEPROM write.
 21. **Save/load projects** in the browser.
+
+## Deferred EEPROM follow-ups
+
+The data EEPROM read/write sequence works (`simulator/peripherals/eeprom.ts`). These parts wait for the feature they depend on:
+
+| Follow-up                                                                                  | Do it with                                     | Why it waits                                                                                              |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **EEIE interrupt**: EEPROM write complete sets EEIF and, with EEIE + GIE, jumps to `0x004` | **Interrupts** (idea 12, together with Timer0) | Needs the interrupt system (GIE, vector `0x004`, push PC, RETFIE) shared with RB0/INT, RB change and TMR0 |
+| **WRERR**: set when a write is interrupted by a reset                                      | **Watchdog + reset types** (idea 14)           | Only power-on reset exists now, and it clears everything anyway                                           |
+| **Write time follows the clock**: 4 ms is 4000 cycles only at 4 MHz                        | **Clock selector** (idea 7)                    | The clock is fixed at 4 MHz, so 4000 cycles is correct today                                              |
+
+## Planned order
+
+1. `pins.ts` + Pins panel (your idea 3)
+2. Breakpoints (your idea 2)
+3. Timer0 + interrupts, including EEIE
+4. Watchdog + SLEEP wake-up + reset types, including WRERR
+5. Clock selector, including the EEPROM write time
+6. Chip SVG (your idea 1)
