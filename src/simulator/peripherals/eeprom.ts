@@ -40,13 +40,22 @@ export class EepromController {
     this.memory = memory;
   }
 
-  reset(): void {
+  // Any reset stops a write in progress (the byte is not written).
+  // Returns true when a write was cut off, so the caller can set WRERR.
+  reset(): boolean {
+    const interrupted = this.writing;
     this.unlock = 0;
     this.cyclesLeft = 0;
+    return interrupted;
   }
 
   get writing(): boolean {
     return this.cyclesLeft > 0;
+  }
+
+  // Cycles until the write in progress finishes (Infinity when none is running)
+  cyclesToDone(): number {
+    return this.writing ? this.cyclesLeft : Infinity;
   }
 
   // The program wrote to EECON2 (it has no storage: it only drives the unlock sequence)

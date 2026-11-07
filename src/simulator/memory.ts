@@ -8,11 +8,12 @@
 // Every address is first turned into its "canonical" address (the bank 0 address
 // for things reachable from both banks), and the value lives at file[canonical].
 
-import { MEMORY } from "../chip/config.ts";
+import { decodeConfig, MEMORY } from "../chip/config.ts";
 import { GPR_END, GPR_START, REGISTER_BY_NAME, REGISTERS } from "../chip/registers.ts";
 import { EepromController } from "./peripherals/eeprom.ts";
 import { PortBInterrupts } from "./peripherals/portbInterrupts.ts";
 import { Timer0 } from "./peripherals/timer0.ts";
+import { Watchdog } from "./peripherals/watchdog.ts";
 import { Pins, portLevels } from "./pins.ts";
 
 const address = (name: string) => REGISTER_BY_NAME.get(name)!.address;
@@ -24,6 +25,7 @@ export const STATUS = address("STATUS");
 export const FSR = address("FSR");
 export const PCLATH = address("PCLATH");
 const EECON1 = address("EECON1");
+const INTCON = address("INTCON");
 const PORTA = address("PORTA");
 const PORTB = address("PORTB");
 const EECON2 = address("EECON2");
@@ -52,6 +54,21 @@ const IMPLEMENTED_BITS = new Map<number, number>([
 // Bits that instructions cannot change (STATUS: NOT_TO, NOT_PD)
 const READ_ONLY_BITS = new Map<number, number>([[STATUS, 0x18]]);
 
+// The ways the chip can be reset (datasheet section 6.3).
+//   power-on: the power is switched on (here: Assemble / the Reset button)
+//   mclr:     the MCLR pin is pulled low
+//   wdt:      the watchdog timed out during normal operation (in SLEEP it wakes up instead)
+export type ResetKind = "power-on" | "mclr" | "wdt";
+
+// MCLR / WDT reset: these registers get their power-on value again;
+// all others (TMR0, FSR, PORTA/PORTB latches, EEDATA, EEADR, RAM) keep their value.
+const RESET_AGAIN = ["PCL", "PCLATH", "OPTION_REG", "TRISA", "TRISB"].map((name) =>
+  REGISTER_BY_NAME.get(name)!,
+);
+
+const WRERR_BIT = 3; // EECON1: a write was cut off by a reset
+const RBIF_BIT = 0; // INTCON
+
 export class Memory {
   readonly program = new Uint16Array(MEMORY.PROGRAM_SIZE); // flash, 14-bit words
   readonly eeprom = new Uint8Array(MEMORY.EEPROM_SIZE); // data EEPROM
@@ -59,6 +76,7 @@ export class Memory {
   readonly eepromController = new EepromController(this); // EECON1 / EECON2 behaviour
   readonly timer0 = new Timer0(this); // TMR0 counting and prescaler
   readonly portbInterrupts = new PortBInterrupts(this); // RB0/INT edge, RB7:RB4 change
+  readonly watchdog = new Watchdog(this); // WDT timeout (on/off from the config word)
   readonly pins = new Pins(); // external pin drives (the outside world)
 
   constructor() {
@@ -67,20 +85,36 @@ export class Memory {
     this.reset();
   }
 
-  // Load an assembled program (from AssemblyResult.program / .eeprom)
-  load(program: number[], eeprom: number[]): void {
+  // Load an assembled program (from AssemblyResult.program / .eeprom / .config)
+  load(program: number[], eeprom: number[], config: number): void {
     this.program.set(program.map((word) => word & MEMORY.WORD_MASK));
     this.eeprom.set(eeprom.map((byte) => byte & 0xff));
+    this.watchdog.enabled = decodeConfig(config).watchdog;
   }
 
-  // Power-on reset: special registers get their reset values, RAM is cleared.
-  // (On the real chip RAM is unknown after power-on; 0 keeps the simulation repeatable.)
-  reset(): void {
-    this.file.fill(0);
-    for (const reg of REGISTERS) this.file[reg.address] = reg.resetValue;
-    this.eepromController.reset();
-    this.timer0.reset();
+  // Reset the data memory and the peripherals (datasheet Table 6-4).
+  // STATUS.NOT_TO / NOT_PD depend on the reset and on SLEEP: the CPU sets them.
+  reset(kind: ResetKind = "power-on"): void {
+    const writeCutOff = this.eepromController.reset();
+
+    if (kind === "power-on") {
+      // Every register gets its reset value, RAM is cleared.
+      // (On the real chip RAM is unknown after power-on; 0 keeps the simulation repeatable.)
+      this.file.fill(0);
+      for (const reg of REGISTERS) this.file[reg.address] = reg.resetValue;
+    } else {
+      const file = this.file;
+      for (const reg of RESET_AGAIN) file[reg.address] = reg.resetValue;
+      file[STATUS] &= 0x1f; // IRP, RP1, RP0 = 0 (bank 0); TO, PD, Z, DC, C kept
+      file[INTCON] &= 1 << RBIF_BIT; // all 0 except RBIF
+      // EECON1: only WRERR is kept, and it is set when the reset cut off a write
+      const wrerr = writeCutOff ? 1 << WRERR_BIT : file[EECON1] & (1 << WRERR_BIT);
+      file[EECON1] = wrerr;
+    }
+
+    this.timer0.reset(); // also clears the prescaler
     this.portbInterrupts.reset();
+    this.watchdog.clear();
   }
 
   // ---------- Addressing ----------

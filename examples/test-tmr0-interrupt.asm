@@ -15,6 +15,7 @@
 
         LIST    P=16F84A
         #include <P16F84A.INC>
+        __CONFIG _CP_OFF & _WDT_OFF & _XT_OSC   ; watchdog off: no CLRWDT in this program
 
 W_TEMP      EQU 0x0C            ; context saving (RAM 0x0C-0x4F is the same in both banks)
 STATUS_TEMP EQU 0x0D

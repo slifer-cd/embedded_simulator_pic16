@@ -46,18 +46,44 @@ const RUN_TICK_MS = 16; // how often the screen updates while running (~60 times
 const STEPS_PER_TICK = 1000; // instructions executed between screen updates
 
 // What to tell the user after a step (null = nothing). Any note also stops Run.
-function noteFor(step: StepResult, sleeping: boolean): SimNote | null {
+function noteFor(step: StepResult, cpu: Cpu): SimNote | null {
   if (step.warnings.length > 0) return { kind: "warning", text: step.warnings[0] };
+  if (step.watchdogReset) {
+    return {
+      kind: "warning",
+      text: "Watchdog reset: the WDT timed out (TO = 0). Use CLRWDT in the program, or __CONFIG _WDT_OFF.",
+    };
+  }
   if (step.endlessLoop) {
     const address = step.address.toString(16).toUpperCase().padStart(4, "0");
     return { kind: "info", text: `Program reached an endless loop (GOTO $) at 0x${address}.` };
   }
-  if (sleeping) return { kind: "info", text: "CPU executed SLEEP (nothing wakes it up yet)." };
+  if (cpu.sleeping && !cpu.canWake) {
+    return {
+      kind: "info",
+      text: "CPU executed SLEEP and nothing can wake it (watchdog off, no INT / RB change / EEPROM interrupt enabled).",
+    };
+  }
   return null;
 }
 
-// Extra info shown after a single Step only (Run must not stop on every interrupt)
-function stepInfo(step: StepResult): SimNote | null {
+// Extra info shown after a single Step only (Run must not stop on these)
+function stepInfo(step: StepResult, cpu: Cpu): SimNote | null {
+  if (step.wakeUp === "watchdog") {
+    return { kind: "info", text: "Watchdog woke the CPU from SLEEP (TO = 0, PD = 0)." };
+  }
+  if (step.wakeUp === "interrupt") {
+    return {
+      kind: "info",
+      text: "An interrupt woke the CPU from SLEEP: it runs the instruction after SLEEP (then jumps to 0x0004 if GIE = 1).",
+    };
+  }
+  if (cpu.sleeping) {
+    return {
+      kind: "info",
+      text: "Sleeping until the watchdog or an enabled INT / RB change / EEPROM interrupt wakes the CPU.",
+    };
+  }
   if (step.interrupt) {
     const address = step.address.toString(16).toUpperCase().padStart(4, "0");
     return { kind: "info", text: `Interrupt after 0x${address}: GIE cleared, jumped to 0x0004.` };
@@ -160,7 +186,7 @@ function App() {
     setRunning(false);
     setSimNote(null);
     if (newResult.success) {
-      cpu.load(newResult.program, newResult.eeprom);
+      cpu.load(newResult.program, newResult.eeprom, newResult.config);
       setSnapshots({ now: cpu.snapshot(), before: null });
     } else {
       setSnapshots(null);
@@ -170,7 +196,7 @@ function App() {
   const handleStep = () => {
     const step = cpu.step();
     showSnapshot(cpu.snapshot());
-    setSimNote(noteFor(step, cpu.sleeping) ?? stepInfo(step));
+    setSimNote(noteFor(step, cpu) ?? stepInfo(step, cpu));
   };
 
   const handleRun = () => {
@@ -191,15 +217,29 @@ function App() {
     setSimNote(null);
   };
 
+  // MCLR pin pulled low: the chip restarts at 0x0000 but keeps RAM and the port latches.
+  // Run is not stopped (like pressing the reset button on a running board).
+  const handleMclr = () => {
+    const inSleep = cpu.sleeping;
+    cpu.reset("mclr");
+    showSnapshot(cpu.snapshot()); // highlight what the reset changed
+    setSimNote({
+      kind: "info",
+      text: inSleep
+        ? "MCLR reset during SLEEP (TO = 1, PD = 0): the program starts again at 0x0000."
+        : "MCLR reset (TO and PD unchanged): the program starts again at 0x0000.",
+    });
+  };
+
   // Run loop: execute a batch of instructions, then update the screen.
   // Stops on a warning (stack overflow, invalid instruction, ...), at an endless loop (GOTO $)
-  // or when the CPU goes to sleep.
+  // or at SLEEP when nothing can wake the CPU (with the watchdog on it keeps running).
   useEffect(() => {
     if (!isRunning) return;
 
     const id = setInterval(() => {
       for (let i = 0; i < STEPS_PER_TICK; i++) {
-        const note = noteFor(cpu.step(), cpu.sleeping);
+        const note = noteFor(cpu.step(), cpu);
         if (note) {
           setSimNote(note);
           setRunning(false);
@@ -262,6 +302,7 @@ function App() {
         onRun={handleRun}
         onStep={handleStep}
         onReset={handleReset}
+        onMclr={handleMclr}
         simulateProblem={canSimulate ? null : (errorProblem ?? "Assemble the code first")}
         running={isRunning}
       />

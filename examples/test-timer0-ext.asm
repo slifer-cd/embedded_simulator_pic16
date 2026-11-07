@@ -11,6 +11,7 @@
 
         LIST    P=16F84A
         #include <P16F84A.INC>
+        __CONFIG _CP_OFF & _WDT_OFF & _XT_OSC   ; watchdog off: no CLRWDT in this program
 
         ORG     0
         BSF     STATUS, RP0     ; bank 1

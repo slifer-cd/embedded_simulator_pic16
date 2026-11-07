@@ -12,7 +12,8 @@ type ToolbarProps = {
 
   onRun: () => void; // starts or stops running
   onStep: () => void;
-  onReset: () => void;
+  onReset: () => void; // power-on reset
+  onMclr: () => void; // MCLR reset (the reset pin), keeps RAM and the port latches
   simulateProblem: string | null; // why simulation is disabled (null = enabled)
   running: boolean;
 };
@@ -21,7 +22,7 @@ const OUTPUT_FILES: OutputFile[] = ["hex", "lst", "err"];
 
 export function Toolbar(props: ToolbarProps) {
   const { onOpen, onSave, onAssemble, onDownload, downloadProblem } = props;
-  const { onRun, onStep, onReset, simulateProblem, running } = props;
+  const { onRun, onStep, onReset, onMclr, simulateProblem, running } = props;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -88,9 +89,20 @@ export function Toolbar(props: ToolbarProps) {
           type="button"
           onClick={onReset}
           disabled={simulateProblem !== null}
-          title={simulateProblem ?? undefined}
+          title={simulateProblem ?? "Power-on reset: like switching the power off and on"}
         >
           Reset
+        </button>
+        <button
+          type="button"
+          onClick={onMclr}
+          disabled={simulateProblem !== null}
+          title={
+            simulateProblem ??
+            "MCLR reset: pull the MCLR pin low, like a reset button on the board. RAM and the port latches keep their values; Run keeps going."
+          }
+        >
+          MCLR
         </button>
       </div>
     </header>

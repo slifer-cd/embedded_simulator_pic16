@@ -13,12 +13,21 @@
 // Sources so far: TMR0 overflow (T0IE / T0IF), RB0/INT edge (INTE / INTF),
 // RB7:RB4 change (RBIE / RBIF), EEPROM write complete (EEIE in INTCON / EEIF in EECON1).
 //
-// Not yet simulated: waking from SLEEP, watchdog.
+// Watchdog (peripherals/watchdog.ts): a timeout resets the chip (WDT reset), or wakes it
+// up when it is in SLEEP: then it goes on with the instruction after SLEEP.
+//
+// SLEEP wake-up by an interrupt: RB0/INT, RB7:RB4 change or EEPROM write complete wake
+// the chip when that source's enable bit and flag are set, WHATEVER GIE is (Timer0 can't:
+// it stops in SLEEP). The chip runs the instruction after SLEEP; then, if GIE = 1, the
+// normal interrupt check jumps to 0x0004. If such an interrupt is already waiting when
+// SLEEP executes, SLEEP works like a NOP (no sleep; WDT, TO and PD are not touched).
+// Not simulated: the oscillator start-up time after a wake-up (1024 clocks for XT/LP/HS).
 
 import { MEMORY } from "../chip/config.ts";
 import { decodeInstruction } from "../chip/instructions.ts";
 import type { Instruction } from "../chip/instructions.ts";
 import { Memory, PCL, PCLATH, STATUS } from "./memory.ts";
+import type { ResetKind } from "./memory.ts";
 import { Stack } from "./stack.ts";
 import type { PinDrives } from "./pins.ts";
 
@@ -46,6 +55,11 @@ const EEIF = 4; // EECON1 bit: the only interrupt flag that is not in INTCON
 
 const ENABLE_BITS = 0x78; // EEIE, T0IE, INTE, RBIE (bits 6-3)
 
+// In SLEEP one step lets up to this many cycles pass (1 ms at 4 MHz), so a 2.3 s watchdog
+// wake-up doesn't take millions of steps. It never jumps past an event (WDT timeout, end of
+// an EEPROM write), so those still happen on the exact cycle.
+const SLEEP_STEP_CYCLES = 1000;
+
 const INTERRUPT_CYCLES = 2; // jump to the interrupt vector (see the comment at the top)
 
 export type StepResult = {
@@ -55,6 +69,8 @@ export type StepResult = {
   cycles: number; // cycles this instruction took (+ the interrupt jump, if one happened)
   warnings: string[]; // e.g. stack overflow
   interrupt: boolean; // an interrupt happened after the instruction: PC = 0x0004
+  watchdogReset: boolean; // the WDT timed out while running: the chip was reset
+  wakeUp: "watchdog" | "interrupt" | null; // the CPU left SLEEP during this step
   endlessLoop: boolean; // "GOTO $" with no interrupt that could get it out: the program is "finished"
 };
 
@@ -78,20 +94,39 @@ export class Cpu {
   cycles = 0; // total instruction cycles since reset
   sleeping = false;
 
-  // Load an assembled program and reset
-  load(program: number[], eeprom: number[]): void {
-    this.memory.load(program, eeprom);
+  // Load an assembled program (config = configuration word, e.g. watchdog on/off) and reset
+  load(program: number[], eeprom: number[], config: number): void {
+    this.memory.load(program, eeprom, config);
     this.reset();
   }
 
-  // Power-on reset (program memory and EEPROM are kept)
-  reset(): void {
-    this.memory.reset();
+  // Reset the chip (program memory and EEPROM are kept). The program starts again at 0x0000.
+  //
+  // STATUS.NOT_TO / NOT_PD tell the program what happened (datasheet Table 6-2):
+  //   power-on                     TO = 1  PD = 1
+  //   MCLR, normal operation       unchanged
+  //   MCLR during SLEEP            TO = 1  PD = 0
+  //   WDT reset, normal operation  TO = 0  PD = 1
+  // (A WDT timeout in SLEEP is a wake-up, not a reset: TO = 0, PD = 0, see the watchdog.)
+  reset(kind: ResetKind = "power-on"): void {
+    const wasSleeping = this.sleeping;
+    this.memory.reset(kind);
     this.stack.reset();
-    this.w = 0;
     this.setPc(MEMORY.RESET_VECTOR);
-    this.cycles = 0;
     this.sleeping = false;
+
+    if (kind === "power-on") {
+      this.w = 0; // unknown on the real chip
+      this.cycles = 0; // MCLR / WDT resets keep W and the cycle count: time goes on
+    } else if (kind === "mclr") {
+      if (wasSleeping) {
+        this.setFlag(NOT_TO, true);
+        this.setFlag(NOT_PD, false);
+      }
+    } else {
+      this.setFlag(NOT_TO, false);
+      this.setFlag(NOT_PD, true);
+    }
   }
 
   snapshot(): CpuSnapshot {
@@ -136,16 +171,39 @@ export class Cpu {
     const warnings: string[] = [];
 
     if (this.sleeping) {
-      // Nothing wakes the chip yet (watchdog / interrupts come later): time just passes
-      this.cycles += 1;
-      this.memory.eepromController.tick(1); // an EEPROM write keeps going during SLEEP
+      // The instruction clock is stopped: Timer0 waits. The EEPROM write, the watchdog
+      // (own RC oscillator) and the PORTB pins (INT edge, RB change) keep working.
+      const mem = this.memory;
+      const elapsed = Math.min(
+        SLEEP_STEP_CYCLES,
+        mem.watchdog.cyclesToTimeout(),
+        mem.eepromController.cyclesToDone(),
+      );
+      this.cycles += elapsed;
+      mem.eepromController.tick(elapsed);
+      mem.portbInterrupts.tick();
+      const timeout = mem.watchdog.tick(elapsed);
+
+      // The PC already points to the instruction after SLEEP: that runs next
+      let wakeUp: StepResult["wakeUp"] = null;
+      if (timeout) {
+        wakeUp = "watchdog"; // TO = 0, PD = 0
+        this.setFlag(NOT_TO, false);
+        this.setFlag(NOT_PD, false);
+      } else if (this.wakeUpRequested()) {
+        wakeUp = "interrupt"; // TO = 1, PD = 0 (as SLEEP left them)
+      }
+      if (wakeUp) this.sleeping = false;
+
       return {
         address,
         word,
         instruction,
-        cycles: 1,
-        warnings: ["Sleeping."],
+        cycles: elapsed,
+        warnings,
         interrupt: false,
+        watchdogReset: false,
+        wakeUp,
         endlessLoop: false,
       };
     }
@@ -163,33 +221,59 @@ export class Cpu {
       cycles += extra;
     }
 
-    this.passTime(cycles);
+    let timeout = this.passTime(cycles);
 
     // Interrupt check, after the instruction (and after the peripherals set their flags)
-    const interrupt = this.interruptPending();
+    const interrupt = !timeout && this.interruptPending();
     if (interrupt) {
       const { overflow } = this.stack.push(this.pc); // pc = the next instruction: return there
       if (overflow) warnings.push("Stack overflow: the oldest return address was lost.");
       const intcon = this.memory.peek(INTCON);
       this.memory.poke(INTCON, intcon & ~(1 << GIE));
       this.setPc(MEMORY.INTERRUPT_VECTOR);
-      this.passTime(INTERRUPT_CYCLES);
+      timeout = this.passTime(INTERRUPT_CYCLES) || timeout;
       cycles += INTERRUPT_CYCLES;
     }
+
+    // Watchdog timeout while running: WDT reset, the program starts again at 0x0000
+    if (timeout) this.reset("wdt");
 
     // GOTO $ only ends the program when no interrupt can get it out of the loop
     // (with interrupts on it is the usual "wait for interrupts" loop)
     const endlessLoop =
-      instruction?.mnemonic === "GOTO" && this.pc === address && !this.interruptsEnabled();
-    return { address, word, instruction, cycles, warnings, interrupt, endlessLoop };
+      !timeout &&
+      instruction?.mnemonic === "GOTO" &&
+      this.pc === address &&
+      !this.interruptsEnabled();
+    return {
+      address,
+      word,
+      instruction,
+      cycles,
+      warnings,
+      interrupt,
+      watchdogReset: timeout,
+      wakeUp: null,
+      endlessLoop,
+    };
   }
 
-  // Cycles pass (not called during SLEEP: the instruction clock stops)
-  private passTime(cycles: number): void {
+  // Something can end SLEEP (so Run should keep going while the CPU sleeps):
+  // the watchdog, or an enabled INT / RB change / EEPROM interrupt
+  get canWake(): boolean {
+    const intcon = this.memory.peek(INTCON);
+    const wakeSources = (1 << INTE) | (1 << RBIE) | (1 << EEIE);
+    return this.memory.watchdog.enabled || (intcon & wakeSources) !== 0;
+  }
+
+  // Cycles pass (not called during SLEEP: the instruction clock stops).
+  // Returns true when the watchdog timed out.
+  private passTime(cycles: number): boolean {
     this.cycles += cycles;
     this.memory.eepromController.tick(cycles); // EEPROM write in progress finishes after ~4 ms
     this.memory.timer0.tick(cycles);
     this.memory.portbInterrupts.tick();
+    return this.memory.watchdog.tick(cycles);
   }
 
   // GIE = 1 and at least one source is enabled: an interrupt can still come.
@@ -203,10 +287,16 @@ export class Cpu {
     const intcon = this.memory.peek(INTCON);
     if (((intcon >> GIE) & 1) === 0) return false;
     const tmr0 = (intcon >> T0IE) & (intcon >> T0IF) & 1;
+    return tmr0 === 1 || this.wakeUpRequested();
+  }
+
+  // A source that can wake the chip from SLEEP has its enable bit and flag set (GIE not needed)
+  private wakeUpRequested(): boolean {
+    const intcon = this.memory.peek(INTCON);
     const int = (intcon >> INTE) & (intcon >> INTF) & 1;
     const rbChange = (intcon >> RBIE) & (intcon >> RBIF) & 1;
     const eeprom = (intcon >> EEIE) & (this.memory.peek(EECON1) >> EEIF) & 1;
-    return (tmr0 | int | rbChange | eeprom) === 1;
+    return (int | rbChange | eeprom) === 1;
   }
 
   // Runs one instruction; returns the extra cycles (taken skip / PCL write)
@@ -430,11 +520,13 @@ export class Cpu {
         mem.poke(INTCON, mem.peek(INTCON) | (1 << GIE));
         break;
       case "CLRWDT":
-        // Watchdog timer is not simulated yet; only the status bits
+        mem.watchdog.clear(); // WDT and its postscaler = 0
         this.setFlag(NOT_TO, true);
         this.setFlag(NOT_PD, true);
         break;
       case "SLEEP":
+        if (this.wakeUpRequested()) break; // a wake-up interrupt is already waiting: NOP
+        mem.watchdog.clear();
         this.setFlag(NOT_TO, true);
         this.setFlag(NOT_PD, false);
         this.sleeping = true;
