@@ -99,8 +99,11 @@ export class Pins {
     b: Array.from({ length: 8 }, () => null),
   };
 
+  version = 0; // goes up on every change, so others can notice a change cheaply (logicTrace.ts)
+
   setDrive(port: "a" | "b", bit: number, drive: Drive): void {
     this.drives[port][bit] = drive;
+    this.version++;
   }
 
   // Fills "into" when given (no new arrays: used by the history ring buffer)
@@ -114,5 +117,6 @@ export class Pins {
   restoreDrives(drives: PinDrives): void {
     for (let i = 0; i < drives.a.length; i++) this.drives.a[i] = drives.a[i];
     for (let i = 0; i < drives.b.length; i++) this.drives.b[i] = drives.b[i];
+    this.version++;
   }
 }

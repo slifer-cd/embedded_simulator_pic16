@@ -10,7 +10,7 @@ A browser-based **PIC16F84A** assembler and simulator: a single-page app in Type
 - **Simulator**: all 35 instructions with pipeline-correct cycle counts, banked data memory, the 8-level stack, data EEPROM read/write, I/O pins, Timer0 (internal clock + prescaler, external clock on RA4/T0CKI), interrupts (TMR0, RB0/INT, RB4–RB7 change, EEPROM write complete), the watchdog, SLEEP wake-up and the power-on / MCLR / WDT reset types.
 - **UI**: editor with line numbers and a Chip tab (live block diagram, `components/ChipView.tsx`, drawn after `public/system.png`), Assemble / Run (with a speed setting) / Step Back / Step / Step Over / Step Out / Reset (power-on) / MCLR, a clock selector in the status bar, and panels for Messages, History / Breakpoints (tabs), Flash, Registers, Stack, RAM, EEPROM and Pins.
 
-Not built yet: a logic analyzer, a watch list, syntax highlighting (see `TODO.md`). `ideas.md` holds the approved feature list, the deferred EEPROM follow-ups and the planned order. `public/instructions.png` is the datasheet instruction table. `examples/` holds `.asm` programs for trying features by hand. `README.md` is still Vite template boilerplate.
+Not built yet: a watch list, syntax highlighting (see `TODO.md`). `ideas.md` holds the approved feature list, the deferred EEPROM follow-ups and the planned order. `public/instructions.png` is the datasheet instruction table. `examples/` holds `.asm` programs for trying features by hand. `README.md` is still Vite template boilerplate.
 
 ## Working agreement (set by the user)
 
@@ -70,6 +70,7 @@ MPASM behaviours that are easy to trip over:
 - **`saveState()` / `restoreState()`:** the complete chip state (`CpuState`), including hidden counters (prescaler, WDT, EEPROM write in progress, PORTB latched levels) and the pin drives, so restoring and running on gives exactly the same result. Each part has its own `save(into?)` / `restore()`; with `into` it fills an existing object (no allocation). **A new piece of hidden state must be added to its class's save/restore**, or step back breaks.
 - **`history.ts`:** ring buffer of `CpuState` slots (created once, then reused). `record()` before each step, `noteStep()` after it (event bits for the History panel), `back(cpu, n)`, `entries(limit)`. Recording costs ~20% of Run speed.
 - **Board** (`utils/board.ts`, `components/BoardView.tsx`, a tab next to Pins): LEDs read the pin levels of the snapshot; buttons drive their pin through `handleDrive` (released level = the resistor, held = the active level), so they work like the Pins panel (interrupts, Step Back).
+- **`logicTrace.ts`:** ring buffer of pin level CHANGES (cycle, PORTA, PORTB). `sample()` after every step / drive change only compares the latches, TRIS, OPTION and `Pins.version`, and computes levels only when one moved. Step Back calls `truncate()`. Shown by `components/LogicView.tsx` (Logic tab next to Messages).
 - **Chip diagram:** `components/ChipView.tsx` draws the datasheet block diagram with live values; `utils/chipPaths.ts` `activeBuses()` works out which buses the last step used (from the newest History entry; `f` resolved through RP0 / FSR) and they are drawn in the accent colour.
 - **`snapshot()`:** copies the state for React. The `Cpu` object itself keeps changing.
 

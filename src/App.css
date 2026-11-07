@@ -862,6 +862,78 @@ button:disabled {
   font-size: 12px;
 }
 
+/* Logic analyzer */
+.logic {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.logic-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.logic-header select {
+  font: inherit;
+  padding: 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  color: var(--text-h);
+}
+
+.logic-time {
+  color: color-mix(in srgb, var(--text) 70%, transparent);
+}
+
+.logic-chart {
+  display: flex;
+  gap: 6px;
+}
+
+.logic-names {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 18px; /* = ROW in LogicView.tsx */
+  color: color-mix(in srgb, var(--text) 70%, transparent);
+}
+
+.logic-names .high {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.logic-waves {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  background: var(--code-bg);
+}
+
+.logic-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.logic-wave {
+  fill: none;
+  stroke: var(--success);
+  stroke-width: 1.5;
+}
+
+.logic-axis {
+  display: flex;
+  justify-content: space-between;
+  padding-left: 34px; /* past the pin names */
+  font-size: 11px;
+  color: color-mix(in srgb, var(--text) 70%, transparent);
+}
+
 /* Simulator status bar */
 .status-bar {
   display: flex;

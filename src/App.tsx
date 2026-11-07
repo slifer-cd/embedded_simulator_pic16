@@ -11,6 +11,7 @@ import { BreakpointsView } from "./components/BreakpointsView.tsx";
 import { ChipView } from "./components/ChipView.tsx";
 import { disassemble } from "./chip/disassembler.ts";
 import { HistoryView } from "./components/HistoryView.tsx";
+import { LogicView } from "./components/LogicView.tsx";
 import { TabbedPanel } from "./components/TabbedPanel.tsx";
 import { MemoryView } from "./components/MemoryView.tsx";
 import { MessagesView } from "./components/MessagesView.tsx";
@@ -27,6 +28,8 @@ import { GPR_END, GPR_START } from "./chip/registers.ts";
 import { Cpu } from "./simulator/cpu.ts";
 import { History } from "./simulator/history.ts";
 import type { HistoryEntry } from "./simulator/history.ts";
+import { LogicTrace } from "./simulator/logicTrace.ts";
+import type { LogicWindow } from "./simulator/logicTrace.ts";
 import type { CpuSnapshot, StepResult } from "./simulator/cpu.ts";
 import type { Drive } from "./simulator/pins.ts";
 import { downloadText } from "./utils/download.ts";
@@ -70,6 +73,7 @@ const RUN_CATCH_UP_MS = 100; // after a pause (e.g. a background tab) don't try 
 const RUN_RATE_MS = 500; // how often the measured speed (x real time) is updated
 const HISTORY_SIZE = 1000; // steps that Step Back can undo
 const HISTORY_ROWS = 200; // newest steps listed in the History panel
+const LOGIC_SIZE = 20_000; // pin level changes kept by the logic analyzer
 
 // Where a Step Over / Step Out run stops: when the stack is back at "depth" and (if pc is
 // given) the PC is at "pc". Comparing the depth too makes recursive CALLs work.
@@ -147,8 +151,20 @@ function App() {
     rows: [],
     length: 0,
   });
+  // Logic analyzer: pin level changes, recorded after every step and pin drive change
+  const [trace] = useState(() => new LogicTrace(LOGIC_SIZE));
+  const [logicSpan, setLogicSpan] = useState(1000); // cycles shown
+  const [logicWindow, setLogicWindow] = useState<LogicWindow | null>(null); // what it draws
+  const [messagesTab, setMessagesTab] = useState("messages"); // Messages / Logic tab
+
+  // Refresh what the History and Logic panels show (copies: the objects keep changing)
   const showHistory = () => {
     setHistoryView({ rows: history.entries(HISTORY_ROWS), length: history.length });
+    setLogicWindow(trace.length > 0 ? trace.window(cpu.cycles - logicSpan, cpu.cycles) : null);
+  };
+  const handleLogicSpan = (span: number) => {
+    setLogicSpan(span);
+    setLogicWindow(trace.length > 0 ? trace.window(cpu.cycles - span, cpu.cycles) : null);
   };
   // The latest snapshot ("now") and the one before it ("before", to highlight what changed)
   const [snapshots, setSnapshots] = useState<{
@@ -267,10 +283,13 @@ function App() {
     if (newResult.success) {
       cpu.load(newResult.program, newResult.eeprom, newResult.config);
       history.clear();
+      trace.clear();
+      trace.sample(cpu); // the levels at the start
       showHistory();
       setSnapshots({ now: cpu.snapshot(), before: null });
     } else {
       setSnapshots(null);
+      setMessagesTab("messages"); // show the errors
     }
   };
 
@@ -278,6 +297,7 @@ function App() {
     history.record(cpu);
     const step = cpu.step();
     history.noteStep(step);
+    trace.sample(cpu);
     showHistory();
     showSnapshot(cpu.snapshot());
     setSimNote(noteFor(step, cpu) ?? stepInfo(step, cpu));
@@ -338,6 +358,8 @@ function App() {
   // Go back several steps at once (a click in the History panel)
   const handleGoBack = (steps: number) => {
     if (!history.back(cpu, steps)) return;
+    trace.truncate(cpu.cycles); // those pin changes haven't happened any more
+    trace.sample(cpu);
     showHistory();
     showSnapshot(cpu.snapshot());
     setSimNote({
@@ -366,6 +388,8 @@ function App() {
   // The user connects an input pin to high / low / nothing (works while running too)
   const handleDrive = (port: "a" | "b", bit: number, drive: Drive) => {
     cpu.memory.pins.setDrive(port, bit, drive);
+    trace.sample(cpu);
+    showHistory();
     showSnapshot(cpu.snapshot());
   };
 
@@ -409,6 +433,8 @@ function App() {
     setRunTarget(null);
     cpu.reset();
     history.clear();
+    trace.clear();
+    trace.sample(cpu);
     showHistory();
     setSnapshots({ now: cpu.snapshot(), before: null });
     setSimNote(null);
@@ -425,6 +451,8 @@ function App() {
   const handleMclr = () => {
     const inSleep = cpu.sleeping;
     cpu.reset("mclr");
+    trace.sample(cpu); // TRIS back to inputs: the pin levels can change
+    showHistory();
     if (runTarget) {
       // The stack is cleared: a Step Over / Out can't reach its target any more
       setRunTarget(null);
@@ -501,6 +529,7 @@ function App() {
         }
         const step = cpu.step();
         history.noteStep(step);
+        trace.sample(cpu);
         const note = noteFor(step, cpu);
         steps++;
         if (note) {
@@ -572,11 +601,24 @@ function App() {
       if (steps > 0) {
         showSnapshot(cpu.snapshot());
         setHistoryView({ rows: history.entries(HISTORY_ROWS), length: history.length });
+        setLogicWindow(trace.window(cpu.cycles - logicSpan, cpu.cycles));
       }
     }, RUN_TICK_MS);
 
     return () => clearInterval(id);
-  }, [isRunning, cpu, history, runSpeed, clockHz, runTarget, breakpoints, dataBreakpoints, result]);
+  }, [
+    isRunning,
+    cpu,
+    history,
+    trace,
+    logicSpan,
+    runSpeed,
+    clockHz,
+    runTarget,
+    breakpoints,
+    dataBreakpoints,
+    result,
+  ]);
 
   // Keep the next instruction visible in the editor while stepping / running
   useEffect(() => {
@@ -766,9 +808,31 @@ function App() {
       </main>
 
       <div className="bottom">
-        <Panel title="Messages">
-          <MessagesView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
-        </Panel>
+        <TabbedPanel
+          selected={messagesTab}
+          onSelect={setMessagesTab}
+          tabs={[
+            {
+              id: "messages",
+              label: "Messages",
+              content: (
+                <MessagesView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
+              ),
+            },
+            {
+              id: "logic",
+              label: "Logic",
+              content: (
+                <LogicView
+                  window={canSimulate ? logicWindow : null}
+                  span={logicSpan}
+                  onSpanChange={handleLogicSpan}
+                  clockHz={clockHz}
+                />
+              ),
+            },
+          ]}
+        />
         <TabbedPanel
           selected={bottomTab}
           onSelect={setBottomTab}
