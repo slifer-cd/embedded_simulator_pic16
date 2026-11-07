@@ -11,6 +11,7 @@
 import { MEMORY } from "../chip/config.ts";
 import { GPR_END, GPR_START, REGISTER_BY_NAME, REGISTERS } from "../chip/registers.ts";
 import { EepromController } from "./peripherals/eeprom.ts";
+import { Pins, portLevels } from "./pins.ts";
 
 const address = (name: string) => REGISTER_BY_NAME.get(name)!.address;
 
@@ -20,6 +21,8 @@ export const STATUS = address("STATUS");
 export const FSR = address("FSR");
 export const PCLATH = address("PCLATH");
 const EECON1 = address("EECON1");
+const PORTA = address("PORTA");
+const PORTB = address("PORTB");
 const EECON2 = address("EECON2");
 
 const RP0_BIT = 5;
@@ -51,6 +54,7 @@ export class Memory {
   readonly eeprom = new Uint8Array(MEMORY.EEPROM_SIZE); // data EEPROM
   readonly file = new Uint8Array(256); // data memory, indexed by canonical address
   readonly eepromController = new EepromController(this); // EECON1 / EECON2 behaviour
+  readonly pins = new Pins(); // external pin drives (the outside world)
 
   constructor() {
     this.program.fill(MEMORY.WORD_MASK); // blank flash = 0x3FFF
@@ -123,10 +127,12 @@ export class Memory {
   // ---------- Direct access by full 8-bit address (UI and CPU internals) ----------
 
   // Read without INDF redirection. Unimplemented addresses, INDF and EECON2 read as 0.
-  // Note: PORTA/PORTB return the output latch for now; real pin levels come with pins.ts.
+  // PORTA / PORTB return the pin levels; their output latches stay in file[] (see pins.ts).
   peek(address8: number): number {
     const where = canonical[address8 & 0xff];
     if (where === null || where === INDF || where === EECON2) return 0;
+    if (where === PORTA) return portLevels(this.file, this.pins.drives).a;
+    if (where === PORTB) return portLevels(this.file, this.pins.drives).b;
     return this.file[where];
   }
 

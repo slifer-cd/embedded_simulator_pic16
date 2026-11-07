@@ -1,6 +1,7 @@
 import { REGISTERS } from "../chip/registers.ts";
 import type { Register } from "../chip/registers.ts";
 import type { CpuSnapshot } from "../simulator/cpu.ts";
+import { portLevels } from "../simulator/pins.ts";
 
 type RegistersViewProps = {
   sim: CpuSnapshot | null; // null = no program loaded
@@ -11,6 +12,15 @@ type RegistersViewProps = {
 const SHOWN = REGISTERS.filter((reg) => reg.name !== "INDF" && reg.name !== "EECON2");
 
 const STATUS = 0x03;
+const PORTA = 0x05;
+const PORTB = 0x06;
+
+// Value a program reads: pin levels for PORTA / PORTB, stored value for everything else
+function readValue(snapshot: CpuSnapshot, address: number): number {
+  if (address === PORTA) return portLevels(snapshot.file, snapshot.drives).a;
+  if (address === PORTB) return portLevels(snapshot.file, snapshot.drives).b;
+  return snapshot.file[address];
+}
 const PCLATH = 0x0a;
 
 function hex(value: number, digits: number): string {
@@ -83,14 +93,22 @@ export function RegistersView({ sim, previous }: RegistersViewProps) {
 
           {/* Special function registers */}
           {SHOWN.map((reg) => {
-            const value = sim.file[reg.address];
-            const before = previous?.file[reg.address];
+            const value = readValue(sim, reg.address);
+            const before = previous ? readValue(previous, reg.address) : undefined;
+            const isPort = reg.address === PORTA || reg.address === PORTB;
             const changedMask = before === undefined ? 0 : value ^ before;
             return (
               <tr key={reg.name}>
-                <th>{reg.name}</th>
+                <th title={isPort ? "Pin levels (what the program reads)" : undefined}>
+                  {reg.name}
+                </th>
                 <td className="reg-addr">{hex(reg.address, 2)}</td>
-                <td className={changed(value, before)}>{hex(value, 2)}</td>
+                <td
+                  className={changed(value, before)}
+                  title={isPort ? `Output latch: ${hex(sim.file[reg.address], 2)}` : undefined}
+                >
+                  {hex(value, 2)}
+                </td>
                 <td>
                   <Bits reg={reg} value={value} changedMask={changedMask} />
                 </td>

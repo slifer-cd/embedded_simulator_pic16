@@ -6,13 +6,14 @@
 //   - a skip that is taken (DECFSZ, INCFSZ, BTFSC, BTFSS)
 //   - a write to PCL (e.g. ADDWF PCL, F for lookup tables)
 //
-// Not yet simulated: Timer0, interrupts, watchdog, pin levels.
+// Not yet simulated: Timer0, interrupts, watchdog.
 
 import { MEMORY } from "../chip/config.ts";
 import { decodeInstruction } from "../chip/instructions.ts";
 import type { Instruction } from "../chip/instructions.ts";
 import { Memory, PCL, PCLATH, STATUS } from "./memory.ts";
 import { Stack } from "./stack.ts";
+import type { PinDrives } from "./pins.ts";
 
 const PC_MASK = 0x1fff; // 13-bit program counter
 
@@ -41,7 +42,8 @@ export type CpuSnapshot = {
   w: number;
   cycles: number;
   sleeping: boolean;
-  file: Uint8Array; // data memory by canonical address
+  file: Uint8Array; // data memory by canonical address (PORTA / PORTB = output latches)
+  drives: PinDrives; // external pin drives, to compute pin levels (see pins.ts)
   eeprom: Uint8Array; // data EEPROM (64 bytes)
   stack: number[]; // valid return addresses, newest first
 };
@@ -77,6 +79,7 @@ export class Cpu {
       cycles: this.cycles,
       sleeping: this.sleeping,
       file: this.memory.file.slice(),
+      drives: this.memory.pins.copyDrives(),
       eeprom: this.memory.eeprom.slice(),
       stack: this.stack.entries(),
     };

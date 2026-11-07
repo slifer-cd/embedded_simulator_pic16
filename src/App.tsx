@@ -9,6 +9,7 @@ import { FlashView } from "./components/FlashView.tsx";
 import { MemoryView } from "./components/MemoryView.tsx";
 import { MessagesView } from "./components/MessagesView.tsx";
 import { Panel } from "./components/Panel.tsx";
+import { PinsView } from "./components/PinsView.tsx";
 import { RegistersView } from "./components/RegistersView.tsx";
 import { StackView } from "./components/StackView.tsx";
 import { StatusBar } from "./components/StatusBar.tsx";
@@ -19,6 +20,7 @@ import { MEMORY } from "./chip/config.ts";
 import { GPR_END, GPR_START } from "./chip/registers.ts";
 import { Cpu } from "./simulator/cpu.ts";
 import type { CpuSnapshot, StepResult } from "./simulator/cpu.ts";
+import type { Drive } from "./simulator/pins.ts";
 import { downloadText } from "./utils/download.ts";
 import { selectLine } from "./utils/selectLine.ts";
 import "./App.css";
@@ -157,6 +159,12 @@ function App() {
     setRunning(!running);
   };
 
+  // The user connects an input pin to high / low / nothing (works while running too)
+  const handleDrive = (port: "a" | "b", bit: number, drive: Drive) => {
+    cpu.memory.pins.setDrive(port, bit, drive);
+    showSnapshot(cpu.snapshot());
+  };
+
   const handleReset = () => {
     setRunning(false);
     cpu.reset();
@@ -241,7 +249,9 @@ function App() {
               lineByAddress={lineByAddress}
             />
           </Panel>
-          <Panel title="Pins" />
+          <Panel title="Pins">
+            <PinsView sim={canSimulate ? sim : null} previous={previousSim} onDrive={handleDrive} />
+          </Panel>
         </div>
       </main>
 
