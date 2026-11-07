@@ -239,3 +239,53 @@ button:disabled {
 .messages-list .message .messages-severity {
   color: var(--text);
 }
+
+/* Flash panel */
+.flash {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.flash-summary {
+  margin: 0;
+  font-weight: 600;
+}
+
+.flash-table {
+  display: block;
+  max-height: 220px;
+  overflow-y: auto;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.flash-table th {
+  position: sticky;
+  top: 0;
+  background: var(--panel-bg);
+  text-align: left;
+  font-weight: 600;
+}
+
+.flash-table th,
+.flash-table td {
+  padding: 2px 8px 2px 0;
+  white-space: nowrap;
+}
+
+.flash-table tbody tr {
+  cursor: pointer;
+  border-top: 1px solid var(--border);
+}
+
+.flash-table tbody tr:hover {
+  background: var(--code-bg);
+}
+
+.flash-label {
+  color: var(--text-h);
+  font-weight: 600;
+}

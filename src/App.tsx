@@ -5,6 +5,7 @@ import { generateErr } from "./assembler/output/err.ts";
 import { generateHex } from "./assembler/output/hex.ts";
 import { generateLst } from "./assembler/output/lst.ts";
 import { CodeEditor } from "./components/CodeEditor.tsx";
+import { FlashView } from "./components/FlashView.tsx";
 import { MessagesView } from "./components/MessagesView.tsx";
 import { Panel } from "./components/Panel.tsx";
 import { Toolbar } from "./components/Toolbar.tsx";
@@ -88,7 +89,9 @@ function App() {
 
       <div className="memory">
         <Panel title="RAM" />
-        <Panel title="Flash" />
+        <Panel title="Flash">
+          <FlashView result={result} onSelectLine={handleSelectLine} />
+        </Panel>
         <Panel title="EEPROM" />
         <Panel title="Messages">
           <MessagesView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
