@@ -32,14 +32,15 @@ What is left to build, in planned order. See `ideas.md` for the full list of app
 - [ ] **16. More directives**: recognised but not supported yet: `MACRO`, `IF` / `ELSE`, `DT`, `BANKSEL`, `__IDLOCS`, `RES`, ...
 - [ ] **17. Compare `.hex` / `.lst` with real MPLAB output**
 
-## Tests (later)
+## Tests
 
-Only the lexer, parser and expressions have tests so far. Still to cover:
+Covered (`vp test`, 231 tests): lexer, parser, expressions, symbols, encoder, assembler, the
+`.hex` / `.lst` / `.err` writers, disassembler, and the simulator's memory, stack, pins, EEPROM
+and CPU (instructions, flags, cycles, banks, INDF, Timer0, interrupts, SLEEP, watchdog, resets,
+save / restore). Still without their own tests:
 
-- [ ] `symbols`, `encoder`, `assembler`
-- [ ] Output writers: `hex`, `lst`, `err`
-- [ ] `disassembler`
-- [ ] Simulator: `memory`, `stack`, `cpu`, `eeprom`, `pins`
+- [ ] `history`, `logicTrace`
+- [ ] `utils/`: `moveBreakpoints`, `highlight`, `dataBreakpoints`, `chipPaths`, `board`
 
 ## Small loose ends
 
