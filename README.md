@@ -43,7 +43,7 @@ The assembler follows MPASM, so a few rules may surprise you:
 
 The [`examples/`](examples) folder has short programs for each feature (pins, Timer0,
 interrupts, EEPROM, SLEEP / watchdog, the stack, the 7-segment display). Each one starts
-with a comment that says what to try. Open one with the **Open** button.
+with a comment that says what to try. Load one from the **Examples…** list in the toolbar.
 
 ## Development
 

@@ -44,7 +44,8 @@ button {
   cursor: pointer;
 }
 
-.run-speed {
+.run-speed,
+.toolbar-select {
   font: inherit;
   font-size: 14px;
   padding: 5px 6px;
@@ -67,6 +68,18 @@ button:disabled {
   gap: 12px;
   /* Fixed height: long code or long lists scroll inside their panel instead of growing the page */
   height: max(360px, 55vh);
+}
+
+/* Chip tab open: the Code / Chip panel spans the row and the row gets taller, because the
+   diagram (1420 x 1180) is far too small in one column. The other panels are only hidden,
+   so they keep their state (e.g. a half-typed watch). */
+.workspace.chip-mode {
+  grid-template-columns: 1fr;
+  height: max(480px, 85vh);
+}
+
+.workspace.chip-mode > :not(:first-child) {
+  display: none;
 }
 
 .side {
@@ -103,7 +116,8 @@ button:disabled {
   }
 
   /* One column: panels stack, so the row can't have one fixed height; the editor gets its own */
-  .workspace {
+  .workspace,
+  .workspace.chip-mode {
     height: auto;
   }
 

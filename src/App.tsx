@@ -47,6 +47,7 @@ import {
   W_TARGET,
 } from "./utils/dataBreakpoints.ts";
 import type { BreakCondition, ConditionOp, DataBreakpoint } from "./utils/dataBreakpoints.ts";
+import type { Example } from "./utils/examples.ts";
 import { DEFAULT_RUN_SPEED, RUN_SPEEDS } from "./utils/runSpeed.ts";
 import type { RunSpeed } from "./utils/runSpeed.ts";
 import { scrollLineIntoView, selectLine } from "./utils/selectLine.ts";
@@ -135,7 +136,7 @@ function App() {
   );
   const [bottomTab, setBottomTab] = useState("history"); // History / Breakpoints tab
   const [mainTab, setMainTab] = useState("code"); // Code / Chip tab
-  const [pinsTab, setPinsTab] = useState("pins"); // Pins / Board tab
+  const [flashTab, setFlashTab] = useState("flash"); // Flash / Board tab
   const [registersTab, setRegistersTab] = useState("registers"); // Registers / Watch tab
   const [watches, setWatches] = useState<Watch[]>([]);
   const [boardParts, setBoardParts] = useState<BoardPart[]>([]); // LEDs and buttons on the pins
@@ -653,16 +654,26 @@ function App() {
     }
   }, [currentLine]);
 
-  // Open an .asm file into the editor (asks first if the current code is not saved)
-  const handleOpen = async (file: File) => {
+  // Put new code in the editor (asks first if the current code is not saved)
+  const loadCode = (text: string, name: string) => {
     if (unsaved && !window.confirm("Replace the current code? Unsaved changes will be lost.")) {
       return;
     }
-    const text = (await file.text()).replace(/\r\n?/g, "\n"); // textarea uses "\n" only
     setCode(text);
     setBreakpoints(new Map()); // they belonged to the old file
     setSavedCode(text);
-    setFileName(file.name.replace(/\.[^.]*$/, "") || DEFAULT_FILE_NAME);
+    setFileName(name || DEFAULT_FILE_NAME);
+  };
+
+  // Open an .asm file into the editor
+  const handleOpen = async (file: File) => {
+    const text = (await file.text()).replace(/\r\n?/g, "\n"); // textarea uses "\n" only
+    loadCode(text, file.name.replace(/\.[^.]*$/, ""));
+  };
+
+  // Load one of the programs in examples/ into the editor
+  const handleOpenExample = (example: Example) => {
+    loadCode(example.code, example.name);
   };
 
   const handleSave = () => {
@@ -694,6 +705,7 @@ function App() {
     <div className="app">
       <Toolbar
         onOpen={handleOpen}
+        onOpenExample={handleOpenExample}
         onSave={handleSave}
         onAssemble={handleAssemble}
         onDownload={handleDownload}
@@ -727,7 +739,8 @@ function App() {
         behind={runSpeed === "realtime" && runRate !== null && runRate < 0.9}
       />
 
-      <main className="workspace">
+      {/* With the Chip tab open, the diagram gets the whole row (the other panels stay mounted, hidden) */}
+      <main className={mainTab === "chip" ? "workspace chip-mode" : "workspace"}>
         <TabbedPanel
           keepMounted
           selected={mainTab}
@@ -810,19 +823,29 @@ function App() {
               <p className="todo">Assemble to load a program</p>
             )}
           </Panel>
+          <Panel title="Pins">
+            <PinsView sim={canSimulate ? sim : null} previous={previousSim} onDrive={handleDrive} />
+          </Panel>
+        </div>
+
+        <div className="side">
+          <Panel title="Stack">
+            <StackView
+              sim={canSimulate ? sim : null}
+              previous={previousSim}
+              labelByAddress={labelByAddress}
+              lineByAddress={lineByAddress}
+            />
+          </Panel>
           <TabbedPanel
-            selected={pinsTab}
-            onSelect={setPinsTab}
+            selected={flashTab}
+            onSelect={setFlashTab}
             tabs={[
               {
-                id: "pins",
-                label: "Pins",
+                id: "flash",
+                label: "Flash",
                 content: (
-                  <PinsView
-                    sim={canSimulate ? sim : null}
-                    previous={previousSim}
-                    onDrive={handleDrive}
-                  />
+                  <FlashView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
                 ),
               },
               {
@@ -840,20 +863,6 @@ function App() {
               },
             ]}
           />
-        </div>
-
-        <div className="side">
-          <Panel title="Stack">
-            <StackView
-              sim={canSimulate ? sim : null}
-              previous={previousSim}
-              labelByAddress={labelByAddress}
-              lineByAddress={lineByAddress}
-            />
-          </Panel>
-          <Panel title="Flash">
-            <FlashView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
-          </Panel>
         </div>
       </main>
 

@@ -1,4 +1,6 @@
 import { useRef } from "react";
+import { EXAMPLES } from "../utils/examples.ts";
+import type { Example } from "../utils/examples.ts";
 import { RUN_SPEEDS } from "../utils/runSpeed.ts";
 import type { RunSpeed } from "../utils/runSpeed.ts";
 
@@ -6,6 +8,7 @@ export type OutputFile = "hex" | "lst" | "err";
 
 type ToolbarProps = {
   onOpen: (file: File) => void; // user picked an .asm file to load into the editor
+  onOpenExample: (example: Example) => void; // user picked one of the programs in examples/
   onSave: () => void; // save the editor contents as .asm
 
   onAssemble: () => void;
@@ -29,7 +32,7 @@ type ToolbarProps = {
 const OUTPUT_FILES: OutputFile[] = ["hex", "lst", "err"];
 
 export function Toolbar(props: ToolbarProps) {
-  const { onOpen, onSave, onAssemble, onDownload, downloadProblem } = props;
+  const { onOpen, onOpenExample, onSave, onAssemble, onDownload, downloadProblem } = props;
   const { onRun, runSpeed, onRunSpeedChange, onStep, onStepOver, onStepOut, onReset, onMclr } =
     props;
   const { onStepBack, canStepBack, simulateProblem, running } = props;
@@ -61,6 +64,25 @@ export function Toolbar(props: ToolbarProps) {
         <button type="button" onClick={onSave} title="Save the code as an .asm file">
           Save
         </button>
+        {/* Always shows "Examples…": picking a program loads it, the list itself keeps no choice */}
+        <select
+          className="toolbar-select"
+          value=""
+          onChange={(e) => {
+            const example = EXAMPLES.find((ex) => ex.name === e.target.value);
+            if (example) onOpenExample(example);
+          }}
+          title="Load an example program into the editor"
+        >
+          <option value="" disabled hidden>
+            Examples…
+          </option>
+          {EXAMPLES.map((example) => (
+            <option key={example.name} value={example.name}>
+              {example.name}
+            </option>
+          ))}
+        </select>
         <span className="separator" />
 
         <button type="button" onClick={onAssemble}>

@@ -18,7 +18,7 @@ What is left to build, in planned order. See `ideas.md` for the full list of app
 - Execution history: full chip state saved before every step (1000 steps, also during Run), Step Back, History panel (click a row to go back)
 - Breakpoints: click a line number or F9; Run / Step Over / Step Out stop before the line (hollow mark = line without an instruction); they move with their lines while editing; Breakpoints tab (next to History) lists them, Clear all; data breakpoints (W / a register / a RAM byte changes or becomes a value); conditional line breakpoints (if W = 05, count > 10, ...)
 - Chip tab (next to Code): live block diagram after the datasheet figure (`public/system.png`), values highlighted when they change; the buses the last instruction used light up
-- Board tab (next to Pins): LEDs (active high / low, colours) and push buttons with a pull-up / pull-down on any pin, a 7-segment display on PORTB (common cathode / anode)
+- Board tab (next to Flash): LEDs (active high / low, colours) and push buttons with a pull-up / pull-down on any pin, a 7-segment display on PORTB (common cathode / anode)
 - Logic analyzer (Logic tab next to Messages): RA0-RA4 / RB0-RB7 waveforms over the last 100 - 1M cycles; records only changes (~7% of Run speed)
 - Watch list (Watch tab next to Registers): W / registers / RAM variables in hex, decimal and binary; variable watches follow their name after re-assembling
 - Syntax highlighting in the editor (uses the assembler's lexer; a coloured layer behind the textarea)
