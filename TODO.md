@@ -18,13 +18,14 @@ What is left to build, in planned order. See `ideas.md` for the full list of app
 - Execution history: full chip state saved before every step (1000 steps, also during Run), Step Back, History panel (click a row to go back)
 - Breakpoints: click a line number or F9; Run / Step Over / Step Out stop before the line (hollow mark = line without an instruction); they move with their lines while editing; Breakpoints tab (next to History) lists them, Clear all; data breakpoints (W / a register / a RAM byte changes or becomes a value); conditional line breakpoints (if W = 05, count > 10, ...)
 - Chip tab (next to Code): live block diagram after the datasheet figure (`public/system.png`), values highlighted when they change; the buses the last instruction used light up
+- Board tab (next to Pins): LEDs (active high / low, colours) and push buttons with a pull-up / pull-down on any pin
 - UI: new panel layout (simulator panels on top), obsidian / ice grey colours with a blue accent
 
 ## Simulator features (in planned order)
 
 ## Display and I/O
 
-- [ ] **11. Virtual components**: LEDs, buttons, 7-segment display
+- [ ] **11. Virtual components, more**: 7-segment display
 - [ ] **12. Logic analyzer**: pin levels over time
 - [ ] **13. Watch list**
 - [ ] **14. Syntax highlighting** in the editor

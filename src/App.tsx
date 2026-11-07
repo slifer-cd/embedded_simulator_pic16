@@ -6,6 +6,7 @@ import { generateHex } from "./assembler/output/hex.ts";
 import { generateLst } from "./assembler/output/lst.ts";
 import { CodeEditor } from "./components/CodeEditor.tsx";
 import { FlashView } from "./components/FlashView.tsx";
+import { BoardView } from "./components/BoardView.tsx";
 import { BreakpointsView } from "./components/BreakpointsView.tsx";
 import { ChipView } from "./components/ChipView.tsx";
 import { disassemble } from "./chip/disassembler.ts";
@@ -29,6 +30,8 @@ import type { HistoryEntry } from "./simulator/history.ts";
 import type { CpuSnapshot, StepResult } from "./simulator/cpu.ts";
 import type { Drive } from "./simulator/pins.ts";
 import { downloadText } from "./utils/download.ts";
+import { buttonLevel } from "./utils/board.ts";
+import type { BoardPart, NewBoardPart } from "./utils/board.ts";
 import { moveBreakpoints } from "./utils/moveBreakpoints.ts";
 import {
   conditionHolds,
@@ -126,6 +129,8 @@ function App() {
   );
   const [bottomTab, setBottomTab] = useState("history"); // History / Breakpoints tab
   const [mainTab, setMainTab] = useState("code"); // Code / Chip tab
+  const [pinsTab, setPinsTab] = useState("pins"); // Pins / Board tab
+  const [boardParts, setBoardParts] = useState<BoardPart[]>([]); // LEDs and buttons on the pins
   const [dataBreakpoints, setDataBreakpoints] = useState<DataBreakpoint[]>([]);
   const [fileName, setFileName] = useState(DEFAULT_FILE_NAME); // base name for .asm/.hex/.lst/.err
   const [savedCode, setSavedCode] = useState(SAMPLE_CODE); // code as last opened / saved
@@ -362,6 +367,24 @@ function App() {
   const handleDrive = (port: "a" | "b", bit: number, drive: Drive) => {
     cpu.memory.pins.setDrive(port, bit, drive);
     showSnapshot(cpu.snapshot());
+  };
+
+  // Board parts. A button's resistor holds its pin at the "released" level from the start;
+  // removing the button leaves the pin open again.
+  const handleAddPart = (part: NewBoardPart) => {
+    const id = Math.max(0, ...boardParts.map((p) => p.id)) + 1;
+    setBoardParts([...boardParts, { ...part, id }]);
+    if (part.kind === "button") {
+      handleDrive(part.pin.port, part.pin.bit, buttonLevel(part.activeLow, false));
+    }
+  };
+  const handleRemovePart = (id: number) => {
+    const part = boardParts.find((p) => p.id === id);
+    setBoardParts(boardParts.filter((p) => p.id !== id));
+    if (part?.kind === "button") handleDrive(part.pin.port, part.pin.bit, null);
+  };
+  const handlePress = (part: BoardPart, pressed: boolean) => {
+    handleDrive(part.pin.port, part.pin.bit, buttonLevel(part.activeLow, pressed));
   };
 
   // Step Out: run until the current subroutine (or interrupt routine) returns, and stop at
@@ -695,9 +718,36 @@ function App() {
               <p className="todo">Assemble to load a program</p>
             )}
           </Panel>
-          <Panel title="Pins">
-            <PinsView sim={canSimulate ? sim : null} previous={previousSim} onDrive={handleDrive} />
-          </Panel>
+          <TabbedPanel
+            selected={pinsTab}
+            onSelect={setPinsTab}
+            tabs={[
+              {
+                id: "pins",
+                label: "Pins",
+                content: (
+                  <PinsView
+                    sim={canSimulate ? sim : null}
+                    previous={previousSim}
+                    onDrive={handleDrive}
+                  />
+                ),
+              },
+              {
+                id: "board",
+                label: boardParts.length > 0 ? `Board (${boardParts.length})` : "Board",
+                content: (
+                  <BoardView
+                    sim={canSimulate ? sim : null}
+                    parts={boardParts}
+                    onAdd={handleAddPart}
+                    onRemove={handleRemovePart}
+                    onPress={handlePress}
+                  />
+                ),
+              },
+            ]}
+          />
         </div>
 
         <div className="side">

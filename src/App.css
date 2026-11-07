@@ -710,6 +710,129 @@ button:disabled {
   fill: var(--success);
 }
 
+/* Board tab: LEDs and buttons */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.board-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.board-part {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 44px;
+}
+
+.board-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-h);
+}
+
+.board-low {
+  font-family: var(--sans);
+  font-size: 10px;
+  color: var(--text);
+}
+
+/* LED: dark when off, glowing when lit */
+.board-led {
+  --led: #dc2626;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--led) 60%, var(--border));
+  background: color-mix(in srgb, var(--led) 18%, var(--code-bg));
+}
+
+.board-led.green {
+  --led: #16a34a;
+}
+
+.board-led.yellow {
+  --led: #eab308;
+}
+
+.board-led.lit {
+  background: radial-gradient(circle at 35% 35%, #ffffff 0 12%, var(--led) 45%);
+  border-color: var(--led);
+  box-shadow: 0 0 10px 2px color-mix(in srgb, var(--led) 70%, transparent);
+}
+
+/* Push button: a round cap that sinks while held */
+.board-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: radial-gradient(circle at 40% 35%, var(--panel-bg), var(--code-bg) 70%);
+  box-shadow: 0 2px 0 var(--border);
+  touch-action: none;
+}
+
+.board-button.held {
+  transform: translateY(2px);
+  box-shadow: none;
+  border-color: var(--accent);
+  background: var(--current-line);
+}
+
+.board-remove {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  color: color-mix(in srgb, var(--text) 60%, transparent);
+  opacity: 0;
+}
+
+.board-part:hover .board-remove,
+.board-remove:focus-visible {
+  opacity: 1;
+}
+
+.board-remove:hover {
+  color: var(--error);
+}
+
+.board-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.board-form select {
+  font: inherit;
+  font-size: 12px;
+  padding: 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  color: var(--text-h);
+}
+
+.board-form button {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
 /* Simulator status bar */
 .status-bar {
   display: flex;
