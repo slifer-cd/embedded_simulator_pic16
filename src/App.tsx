@@ -28,6 +28,13 @@ import type { CpuSnapshot, StepResult } from "./simulator/cpu.ts";
 import type { Drive } from "./simulator/pins.ts";
 import { downloadText } from "./utils/download.ts";
 import { moveBreakpoints } from "./utils/moveBreakpoints.ts";
+import {
+  dataBreakpointHit,
+  dataBreakpointKey,
+  targetName,
+  W_TARGET,
+} from "./utils/dataBreakpoints.ts";
+import type { DataBreakpoint } from "./utils/dataBreakpoints.ts";
 import { DEFAULT_RUN_SPEED, RUN_SPEEDS } from "./utils/runSpeed.ts";
 import type { RunSpeed } from "./utils/runSpeed.ts";
 import { scrollLineIntoView, selectLine } from "./utils/selectLine.ts";
@@ -111,6 +118,7 @@ function App() {
   const [code, setCode] = useState(SAMPLE_CODE);
   const [breakpoints, setBreakpoints] = useState<ReadonlySet<number>>(new Set()); // source lines
   const [bottomTab, setBottomTab] = useState("history"); // History / Breakpoints tab
+  const [dataBreakpoints, setDataBreakpoints] = useState<DataBreakpoint[]>([]);
   const [fileName, setFileName] = useState(DEFAULT_FILE_NAME); // base name for .asm/.hex/.lst/.err
   const [savedCode, setSavedCode] = useState(SAMPLE_CODE); // code as last opened / saved
   const unsaved = code !== savedCode;
@@ -274,6 +282,17 @@ function App() {
     setCode(next);
   };
 
+  // Data breakpoints: add (ignored if the same one exists) / remove
+  const handleAddDataBreakpoint = (target: number, value: number | null) => {
+    const bp = { target, value, label: targetName(target, ramNames) };
+    setDataBreakpoints((old) =>
+      old.some((b) => dataBreakpointKey(b) === dataBreakpointKey(bp)) ? old : [...old, bp],
+    );
+  };
+  const handleRemoveDataBreakpoint = (key: string) => {
+    setDataBreakpoints((old) => old.filter((b) => dataBreakpointKey(b) !== key));
+  };
+
   // Set or clear a breakpoint on a source line (also while running)
   const handleToggleBreakpoint = (line: number) => {
     setBreakpoints((old) => {
@@ -384,6 +403,12 @@ function App() {
     const speedId = runTarget ? "max" : runSpeed; // Step Over / Out runs as fast as it can
 
     // Breakpoints: program address -> source line (the first word of each breakpoint line)
+    // Data breakpoints: values before each step (reused array, no allocation per step)
+    const readTarget = (target: number) => (target === W_TARGET ? cpu.w : cpu.memory.peek(target));
+    const dataBefore = dataBreakpoints.map(() => 0);
+    const lineAt = new Map<number, number>(); // program address -> source line, for messages
+    for (const word of result?.words ?? []) lineAt.set(word.address, word.line);
+
     const breakAt = new Map<number, number>();
     const linesDone = new Set<number>();
     for (const word of result?.words ?? []) {
@@ -426,6 +451,9 @@ function App() {
         // Too slow for this speed (or "max"): stop for this tick and let the page draw
         if (steps % 1024 === 1023 && performance.now() > deadline) break;
         history.record(cpu);
+        for (let i = 0; i < dataBreakpoints.length; i++) {
+          dataBefore[i] = readTarget(dataBreakpoints[i].target);
+        }
         const step = cpu.step();
         history.noteStep(step);
         const note = noteFor(step, cpu);
@@ -442,6 +470,23 @@ function App() {
         if (breakLine !== undefined) {
           const address = cpu.pc.toString(16).toUpperCase().padStart(4, "0");
           setSimNote({ kind: "info", text: `Breakpoint at line ${breakLine} (0x${address}).` });
+          setRunning(false);
+          setRunTarget(null);
+          break;
+        }
+        // Data breakpoint: stop AFTER the instruction that changed the value
+        const hit = dataBreakpoints.findIndex((bp, i) =>
+          dataBreakpointHit(bp, dataBefore[i], readTarget(bp.target)),
+        );
+        if (hit !== -1) {
+          const bp = dataBreakpoints[hit];
+          const hex2 = (v: number) => `0x${v.toString(16).toUpperCase().padStart(2, "0")}`;
+          const at = step.address.toString(16).toUpperCase().padStart(4, "0");
+          const line = lineAt.get(step.address);
+          setSimNote({
+            kind: "info",
+            text: `Data breakpoint: ${bp.label} changed ${hex2(dataBefore[hit])} → ${hex2(readTarget(bp.target))} at 0x${at}${line ? ` (line ${line})` : ""}.`,
+          });
           setRunning(false);
           setRunTarget(null);
           break;
@@ -477,7 +522,7 @@ function App() {
     }, RUN_TICK_MS);
 
     return () => clearInterval(id);
-  }, [isRunning, cpu, history, runSpeed, clockHz, runTarget, breakpoints, result]);
+  }, [isRunning, cpu, history, runSpeed, clockHz, runTarget, breakpoints, dataBreakpoints, result]);
 
   // Keep the next instruction visible in the editor while stepping / running
   useEffect(() => {
@@ -637,7 +682,14 @@ function App() {
                   outdated={outdated}
                   onSelect={handleSelectLine}
                   onRemove={handleToggleBreakpoint}
-                  onClearAll={() => setBreakpoints(new Set())}
+                  onClearAll={() => {
+                    setBreakpoints(new Set());
+                    setDataBreakpoints([]);
+                  }}
+                  dataBreakpoints={dataBreakpoints}
+                  ramNames={ramNames}
+                  onAddData={handleAddDataBreakpoint}
+                  onRemoveData={handleRemoveDataBreakpoint}
                 />
               ),
             },

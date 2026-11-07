@@ -537,6 +537,37 @@ button:disabled {
   max-width: 0; /* let the source text shrink instead of widening the panel */
 }
 
+/* "Stop when [target] [changes/becomes] [value] Add" */
+.breakpoints-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.breakpoints-form select,
+.breakpoints-form input {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  color: var(--text-h);
+}
+
+.breakpoints-form input.invalid {
+  border-color: var(--error);
+}
+
+.breakpoints-form button {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
 .breakpoints-remove {
   padding: 0 6px;
   border: none;
