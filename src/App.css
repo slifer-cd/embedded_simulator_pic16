@@ -54,7 +54,8 @@ button:disabled {
   display: grid;
   grid-template-columns: 2fr 1.5fr 1.3fr 1fr;
   gap: 12px;
-  min-height: 420px;
+  /* Fixed height: long code or long lists scroll inside their panel instead of growing the page */
+  height: max(360px, 55vh);
 }
 
 .side {
@@ -79,6 +80,15 @@ button:disabled {
   .workspace,
   .memory {
     grid-template-columns: 1fr;
+  }
+
+  /* One column: panels stack, so the row can't have one fixed height; the editor gets its own */
+  .workspace {
+    height: auto;
+  }
+
+  .editor-wrap {
+    height: 50vh;
   }
 }
 
@@ -120,7 +130,7 @@ button:disabled {
 .editor-wrap {
   flex: 1;
   display: flex;
-  min-height: 380px;
+  min-height: 0; /* fit the panel; the textarea scrolls (and the gutter follows it) */
   background: var(--code-bg);
 }
 
