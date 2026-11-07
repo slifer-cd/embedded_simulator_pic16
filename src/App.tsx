@@ -13,6 +13,8 @@ import { disassemble } from "./chip/disassembler.ts";
 import { HistoryView } from "./components/HistoryView.tsx";
 import { LogicView } from "./components/LogicView.tsx";
 import { TabbedPanel } from "./components/TabbedPanel.tsx";
+import { WatchView } from "./components/WatchView.tsx";
+import type { Watch } from "./components/WatchView.tsx";
 import { MemoryView } from "./components/MemoryView.tsx";
 import { MessagesView } from "./components/MessagesView.tsx";
 import { Panel } from "./components/Panel.tsx";
@@ -134,6 +136,8 @@ function App() {
   const [bottomTab, setBottomTab] = useState("history"); // History / Breakpoints tab
   const [mainTab, setMainTab] = useState("code"); // Code / Chip tab
   const [pinsTab, setPinsTab] = useState("pins"); // Pins / Board tab
+  const [registersTab, setRegistersTab] = useState("registers"); // Registers / Watch tab
+  const [watches, setWatches] = useState<Watch[]>([]);
   const [boardParts, setBoardParts] = useState<BoardPart[]>([]); // LEDs and buttons on the pins
   const [dataBreakpoints, setDataBreakpoints] = useState<DataBreakpoint[]>([]);
   const [fileName, setFileName] = useState(DEFAULT_FILE_NAME); // base name for .asm/.hex/.lst/.err
@@ -255,6 +259,28 @@ function App() {
     if (address < GPR_START || address > GPR_END) continue;
     ramNames.set(address, [...(ramNames.get(address) ?? []), name]);
   }
+  // ... and the other way round: variable name -> address (for the watch list)
+  const variables = new Map<string, number>();
+  for (const [address, names] of ramNames) for (const name of names) variables.set(name, address);
+
+  // Watch list: add (ignored if already watched), remove, add every RAM variable
+  const watchKey = (w: Watch) => w.variable ?? `#${w.target}`;
+  const handleAddWatch = (watch: Watch) => {
+    setWatches((old) => (old.some((w) => watchKey(w) === watchKey(watch)) ? old : [...old, watch]));
+  };
+  const handleRemoveWatch = (index: number) => {
+    setWatches((old) => old.filter((_, i) => i !== index));
+  };
+  const handleWatchAllVariables = () => {
+    const all = [...variables].sort((a, b) => a[1] - b[1]);
+    setWatches((old) => {
+      const known = new Set(old.map(watchKey));
+      const added = all
+        .filter(([name]) => !known.has(name))
+        .map(([name, address]) => ({ target: address, variable: name }));
+      return [...old, ...added];
+    });
+  };
 
   // EEPROM address -> label names (labels on DE data at ORG 0x2100)
   const eepromNames = new Map<number, string[]>();
@@ -742,9 +768,33 @@ function App() {
           ]}
         />
 
-        <Panel title="Registers">
-          <RegistersView sim={canSimulate ? sim : null} previous={previousSim} />
-        </Panel>
+        <TabbedPanel
+          selected={registersTab}
+          onSelect={setRegistersTab}
+          tabs={[
+            {
+              id: "registers",
+              label: "Registers",
+              content: <RegistersView sim={canSimulate ? sim : null} previous={previousSim} />,
+            },
+            {
+              id: "watch",
+              label: watches.length > 0 ? `Watch (${watches.length})` : "Watch",
+              content: (
+                <WatchView
+                  sim={canSimulate ? sim : null}
+                  previous={canSimulate ? previousSim : null}
+                  watches={watches}
+                  ramNames={ramNames}
+                  variables={variables}
+                  onAdd={handleAddWatch}
+                  onRemove={handleRemoveWatch}
+                  onAddAllVariables={handleWatchAllVariables}
+                />
+              ),
+            },
+          ]}
+        />
 
         <div className="side">
           <Panel title="RAM">

@@ -20,13 +20,13 @@ What is left to build, in planned order. See `ideas.md` for the full list of app
 - Chip tab (next to Code): live block diagram after the datasheet figure (`public/system.png`), values highlighted when they change; the buses the last instruction used light up
 - Board tab (next to Pins): LEDs (active high / low, colours) and push buttons with a pull-up / pull-down on any pin, a 7-segment display on PORTB (common cathode / anode)
 - Logic analyzer (Logic tab next to Messages): RA0-RA4 / RB0-RB7 waveforms over the last 100 - 1M cycles; records only changes (~7% of Run speed)
+- Watch list (Watch tab next to Registers): W / registers / RAM variables in hex, decimal and binary; variable watches follow their name after re-assembling
 - UI: new panel layout (simulator panels on top), obsidian / ice grey colours with a blue accent
 
 ## Simulator features (in planned order)
 
 ## Display and I/O
 
-- [ ] **13. Watch list**
 - [ ] **14. Syntax highlighting** in the editor
 
 ## Assembler extras
