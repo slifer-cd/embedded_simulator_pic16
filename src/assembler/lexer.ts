@@ -165,14 +165,19 @@ export function tokenize(source: string): LexerResult {
     const [word, rest] = firstWord(code);
 
     // 3. Inside CBLOCK ... ENDC the lines are just names: "COUNT, TEMP"
+    //    (END also ends it, so a missing ENDC does not swallow END)
     if (inCblock) {
-      if (word.toUpperCase() === "ENDC") {
+      const upper = word.toUpperCase();
+      if (upper === "ENDC") {
         inCblock = false;
         result.mnemonic = "ENDC";
-      } else {
-        result.operands = splitOperands(code);
+        return;
       }
-      return;
+      if (upper !== "END") {
+        result.operands = splitOperands(code);
+        return;
+      }
+      inCblock = false; // END: handle it as a normal line below
     }
 
     // 4. Label or mnemonic?
