@@ -441,14 +441,24 @@ button:disabled {
   font-weight: 600;
 }
 
-.flash-table {
-  display: block;
+/* Scrolls the table; the table itself stays a real table so it can fill the panel width */
+.flash-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+
+.flash-table {
+  width: 100%;
   border-collapse: collapse;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
+}
+
+/* Addr / Word / Label stay as narrow as their content; Instruction takes the rest */
+.flash-table th:last-child,
+.flash-table td:last-child {
+  width: 100%;
 }
 
 .flash-table th {

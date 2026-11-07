@@ -44,34 +44,36 @@ export function FlashView({ result, outdated, onSelectLine }: FlashViewProps) {
       {words.length === 0 ? (
         <p className="todo">No code</p>
       ) : (
-        <table className="flash-table">
-          <thead>
-            <tr>
-              <th>Addr</th>
-              <th>Word</th>
-              <th>Label</th>
-              <th>Instruction</th>
-            </tr>
-          </thead>
-          <tbody>
-            {words.map((w) => (
-              <tr
-                key={w.address}
-                tabIndex={0}
-                onClick={() => onSelectLine(w.line)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onSelectLine(w.line);
-                }}
-                title={`Line ${w.line}`}
-              >
-                <td>{hex(w.address, 4)}</td>
-                <td>{hex(w.value, 4)}</td>
-                <td className="flash-label">{labels.get(w.address)?.join(", ")}</td>
-                <td>{disassemble(w.value)}</td>
+        <div className="flash-scroll">
+          <table className="flash-table">
+            <thead>
+              <tr>
+                <th>Addr</th>
+                <th>Word</th>
+                <th>Label</th>
+                <th>Instruction</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {words.map((w) => (
+                <tr
+                  key={w.address}
+                  tabIndex={0}
+                  onClick={() => onSelectLine(w.line)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") onSelectLine(w.line);
+                  }}
+                  title={`Line ${w.line}`}
+                >
+                  <td>{hex(w.address, 4)}</td>
+                  <td>{hex(w.value, 4)}</td>
+                  <td className="flash-label">{labels.get(w.address)?.join(", ")}</td>
+                  <td>{disassemble(w.value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
