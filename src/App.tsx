@@ -8,6 +8,8 @@ import { CodeEditor } from "./components/CodeEditor.tsx";
 import { FlashView } from "./components/FlashView.tsx";
 import { MessagesView } from "./components/MessagesView.tsx";
 import { Panel } from "./components/Panel.tsx";
+import { RegistersView } from "./components/RegistersView.tsx";
+import { StackView } from "./components/StackView.tsx";
 import { StatusBar } from "./components/StatusBar.tsx";
 import type { SimNote } from "./components/StatusBar.tsx";
 import { Toolbar } from "./components/Toolbar.tsx";
@@ -57,7 +59,13 @@ function App() {
 
   // Simulator: one Cpu object for the whole session; the UI shows snapshots of it
   const [cpu] = useState(() => new Cpu());
-  const [sim, setSim] = useState<CpuSnapshot | null>(null); // null = no program loaded
+  // The latest snapshot ("now") and the one before it ("before", to highlight what changed)
+  const [snapshots, setSnapshots] = useState<{
+    now: CpuSnapshot;
+    before: CpuSnapshot | null;
+  } | null>(null); // null = no program loaded
+  const sim = snapshots?.now ?? null;
+  const previousSim = snapshots?.before ?? null;
   const [running, setRunning] = useState(false);
   const [simNote, setSimNote] = useState<SimNote | null>(null); // last warning / info from the simulator
 
@@ -83,7 +91,24 @@ function App() {
   for (const word of result?.words ?? []) {
     if (word.address < MEMORY.PROGRAM_SIZE) lineByAddress.set(word.address, word.line);
   }
+  // Program address -> label name (first label if there are several), for the Stack panel
+  const labelByAddress = new Map<number, string>();
+  for (const [name, symbol] of result?.symbols ?? []) {
+    if (
+      symbol.kind === "label" &&
+      symbol.value < MEMORY.PROGRAM_SIZE &&
+      !labelByAddress.has(symbol.value)
+    ) {
+      labelByAddress.set(symbol.value, name);
+    }
+  }
+
   const currentLine = canSimulate ? lineByAddress.get(sim.pc % MEMORY.PROGRAM_SIZE) : undefined;
+
+  // New snapshot after a step / run tick; the old one becomes "before"
+  const showSnapshot = (next: CpuSnapshot) => {
+    setSnapshots((old) => ({ now: next, before: old?.now ?? null }));
+  };
 
   const handleAssemble = () => {
     const newResult = assemble(code);
@@ -95,15 +120,15 @@ function App() {
     setSimNote(null);
     if (newResult.success) {
       cpu.load(newResult.program, newResult.eeprom);
-      setSim(cpu.snapshot());
+      setSnapshots({ now: cpu.snapshot(), before: null });
     } else {
-      setSim(null);
+      setSnapshots(null);
     }
   };
 
   const handleStep = () => {
     const step = cpu.step();
-    setSim(cpu.snapshot());
+    showSnapshot(cpu.snapshot());
     setSimNote(noteFor(step, cpu.sleeping));
   };
 
@@ -115,7 +140,7 @@ function App() {
   const handleReset = () => {
     setRunning(false);
     cpu.reset();
-    setSim(cpu.snapshot());
+    setSnapshots({ now: cpu.snapshot(), before: null });
     setSimNote(null);
   };
 
@@ -134,7 +159,7 @@ function App() {
           break;
         }
       }
-      setSim(cpu.snapshot());
+      showSnapshot(cpu.snapshot());
     }, RUN_TICK_MS);
 
     return () => clearInterval(id);
@@ -183,9 +208,19 @@ function App() {
 
         <Panel title="Chip" />
 
+        <Panel title="Registers">
+          <RegistersView sim={canSimulate ? sim : null} previous={previousSim} />
+        </Panel>
+
         <div className="side">
-          <Panel title="Registers" />
-          <Panel title="Stack" />
+          <Panel title="Stack">
+            <StackView
+              sim={canSimulate ? sim : null}
+              previous={previousSim}
+              labelByAddress={labelByAddress}
+              lineByAddress={lineByAddress}
+            />
+          </Panel>
           <Panel title="Pins" />
         </div>
       </main>

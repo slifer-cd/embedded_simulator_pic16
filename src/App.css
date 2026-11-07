@@ -49,10 +49,10 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* Main area: code | chip | side panels */
+/* Main area: code | chip | registers | stack + pins */
 .workspace {
   display: grid;
-  grid-template-columns: 2fr 2fr 1fr;
+  grid-template-columns: 2fr 1.5fr 1.3fr 1fr;
   gap: 12px;
   min-height: 420px;
 }
@@ -90,6 +90,7 @@ button:disabled {
   border-radius: 6px;
   background: var(--panel-bg);
   overflow: hidden;
+  min-height: 0; /* lets a panel be smaller than its content (then its body scrolls) */
 }
 
 .panel h2 {
@@ -104,6 +105,8 @@ button:disabled {
   display: flex;
   flex-direction: column;
   padding: 8px;
+  min-height: 0;
+  overflow: auto; /* content taller or wider than the panel scrolls */
 }
 
 .todo {
@@ -350,5 +353,125 @@ button:disabled {
 }
 
 .status-note.info {
+  color: var(--accent);
+}
+
+/* Registers panel */
+.reg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.reg-table th {
+  padding: 1px 6px 1px 0;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-h);
+  white-space: nowrap;
+}
+
+.reg-table td {
+  padding: 1px 6px 1px 0;
+  white-space: nowrap;
+}
+
+.reg-table tr + tr {
+  border-top: 1px solid var(--border);
+}
+
+.reg-addr,
+.reg-note {
+  color: color-mix(in srgb, var(--text) 70%, transparent);
+}
+
+.reg-note {
+  font-family: var(--sans);
+}
+
+/* Value or bit that changed in the last step */
+.reg-table .changed {
+  color: var(--accent);
+  font-weight: 700;
+  background: var(--current-line);
+}
+
+.reg-bits {
+  display: inline-flex;
+  gap: 1px;
+}
+
+.reg-bit {
+  width: 1.4ch;
+  text-align: center;
+  border-radius: 2px;
+  color: color-mix(in srgb, var(--text) 60%, transparent);
+  cursor: help;
+}
+
+.reg-bit.on {
+  color: var(--text-h);
+  font-weight: 700;
+}
+
+.reg-bit.unused {
+  opacity: 0.4;
+}
+
+/* Stack panel */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.stack-summary {
+  margin: 0;
+  font-weight: 600;
+}
+
+.stack-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--mono);
+}
+
+.stack-list li {
+  display: grid;
+  grid-template-columns: 3.5ch 5ch 1fr;
+  gap: 6px;
+  padding: 1px 2px;
+  border-top: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.stack-level {
+  color: color-mix(in srgb, var(--text) 70%, transparent);
+}
+
+.stack-address {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.stack-info {
+  font-family: var(--sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stack-list li.empty {
+  opacity: 0.4;
+}
+
+/* Entry pushed by the last step */
+.stack-list li.changed {
+  background: var(--current-line);
+}
+
+.stack-list li.changed .stack-address {
   color: var(--accent);
 }
