@@ -18,6 +18,15 @@
   --warning: #b45309;
   --success: #15803d;
 
+  /* Syntax highlighting in the editor */
+  --hl-comment: #6b7280;
+  --hl-instruction: #2563eb;
+  --hl-directive: #7c3aed;
+  --hl-label: #c2410c;
+  --hl-number: #15803d;
+  --hl-string: #a16207;
+  --hl-builtin: #0f766e;
+
   --sans: system-ui, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
@@ -43,6 +52,14 @@
     --error: #f87171;
     --warning: #fbbf24;
     --success: #4ade80;
+
+    --hl-comment: #8b929c;
+    --hl-instruction: #60a5fa;
+    --hl-directive: #c4b5fd;
+    --hl-label: #fdba74;
+    --hl-number: #86efac;
+    --hl-string: #fcd34d;
+    --hl-builtin: #5eead4;
   }
 }
 

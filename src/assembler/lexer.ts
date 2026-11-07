@@ -80,7 +80,8 @@ function isDirective(word: string): boolean {
 }
 
 // Find the first ";" that is not inside quotes. Returns -1 if there is none.
-function findComment(text: string): number {
+// (Also used by the editor's syntax highlighting, so both split lines the same way.)
+export function findComment(text: string): number {
   let quote = "";
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];

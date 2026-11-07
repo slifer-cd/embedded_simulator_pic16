@@ -187,7 +187,8 @@ button:disabled {
 }
 
 .editor-gutter,
-.editor {
+.editor,
+.editor-highlight {
   font-family: var(--mono);
   font-size: 14px;
   line-height: 1.5;
@@ -286,7 +287,59 @@ button:disabled {
   tab-size: 8;
   white-space: pre;
   background: transparent;
+  color: transparent; /* the coloured copy behind it shows the text (syntax highlighting) */
+  caret-color: var(--text-h);
+}
+
+.editor::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* Syntax-highlighted copy of the code, behind the textarea (CodeEditor.tsx).
+   Font, size, line height, padding and tab size must match .editor exactly. */
+.editor-highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  padding-left: 8px;
+  padding-right: 4px;
+  padding-bottom: 4px;
+  tab-size: 8;
+  white-space: pre;
   color: var(--text-h);
+  pointer-events: none;
+}
+
+.hl-comment {
+  color: var(--hl-comment);
+  font-style: italic;
+}
+
+.hl-instruction {
+  color: var(--hl-instruction);
+  font-weight: 700;
+}
+
+.hl-directive {
+  color: var(--hl-directive);
+  font-weight: 700;
+}
+
+.hl-label {
+  color: var(--hl-label);
+}
+
+.hl-number {
+  color: var(--hl-number);
+}
+
+.hl-string {
+  color: var(--hl-string);
+}
+
+.hl-builtin {
+  color: var(--hl-builtin);
 }
 
 /* Messages panel */

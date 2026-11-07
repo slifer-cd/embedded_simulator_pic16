@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import type { KeyboardEvent, Ref } from "react";
 import { describeCondition } from "../utils/dataBreakpoints.ts";
+import { highlight } from "../utils/highlight.ts";
 import type { BreakCondition } from "../utils/dataBreakpoints.ts";
 
 type CodeEditorProps = {
@@ -108,6 +109,8 @@ export function CodeEditor(props: CodeEditorProps) {
   const { code, onChange, currentLine, ref, breakpoints, codeLines, onToggleBreakpoint } = props;
   const gutterRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const lines = highlight(code); // coloured pieces per line (utils/highlight.ts)
 
   const lineCount = code.split("\n").length;
   const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
@@ -156,6 +159,29 @@ export function CodeEditor(props: CodeEditorProps) {
             style={{ top: `calc(4px + ${(currentLine - 1) * LINE_HEIGHT_EM}em - ${scrollTop}px)` }}
           />
         )}
+        {/* Syntax highlighting: a coloured copy of the code BEHIND the textarea, whose own text
+            is transparent (the cursor and the selection stay visible). Same font, size,
+            padding and tab size, so the letters line up; it scrolls with the textarea. */}
+        <pre
+          className="editor-highlight"
+          aria-hidden="true"
+          style={{ transform: `translate(${-scrollLeft}px, ${-scrollTop}px)` }}
+        >
+          {lines.map((tokens, i) => (
+            <Fragment key={i}>
+              {tokens.map((token, j) =>
+                token.kind ? (
+                  <span key={j} className={`hl-${token.kind}`}>
+                    {token.text}
+                  </span>
+                ) : (
+                  token.text
+                ),
+              )}
+              {i < lines.length - 1 ? "\n" : " "}
+            </Fragment>
+          ))}
+        </pre>
         <textarea
           ref={ref}
           className="editor"
@@ -174,6 +200,7 @@ export function CodeEditor(props: CodeEditorProps) {
             const top = e.currentTarget.scrollTop;
             if (gutterRef.current) gutterRef.current.scrollTop = top;
             setScrollTop(top);
+            setScrollLeft(e.currentTarget.scrollLeft);
           }}
           spellCheck={false}
           wrap="off"
