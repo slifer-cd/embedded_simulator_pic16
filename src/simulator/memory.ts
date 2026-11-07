@@ -11,6 +11,7 @@
 import { MEMORY } from "../chip/config.ts";
 import { GPR_END, GPR_START, REGISTER_BY_NAME, REGISTERS } from "../chip/registers.ts";
 import { EepromController } from "./peripherals/eeprom.ts";
+import { PortBInterrupts } from "./peripherals/portbInterrupts.ts";
 import { Timer0 } from "./peripherals/timer0.ts";
 import { Pins, portLevels } from "./pins.ts";
 
@@ -57,6 +58,7 @@ export class Memory {
   readonly file = new Uint8Array(256); // data memory, indexed by canonical address
   readonly eepromController = new EepromController(this); // EECON1 / EECON2 behaviour
   readonly timer0 = new Timer0(this); // TMR0 counting and prescaler
+  readonly portbInterrupts = new PortBInterrupts(this); // RB0/INT edge, RB7:RB4 change
   readonly pins = new Pins(); // external pin drives (the outside world)
 
   constructor() {
@@ -78,6 +80,7 @@ export class Memory {
     for (const reg of REGISTERS) this.file[reg.address] = reg.resetValue;
     this.eepromController.reset();
     this.timer0.reset();
+    this.portbInterrupts.reset();
   }
 
   // ---------- Addressing ----------
@@ -105,7 +108,11 @@ export class Memory {
   // ---------- Instruction access (f = 7 bits from the instruction) ----------
 
   read(f: number): number {
-    return this.peek(this.effectiveAddress(f));
+    const address8 = this.effectiveAddress(f);
+    const value = this.peek(address8);
+    // Reading PORTB stores the RB7:RB4 levels for the change interrupt (see portbInterrupts.ts)
+    if (canonical[address8] === PORTB) this.portbInterrupts.portbRead(value);
+    return value;
   }
 
   write(f: number, value: number): void {

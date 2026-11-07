@@ -10,7 +10,8 @@
 // its flag set, the CPU pushes the PC (the return address), clears GIE (so the routine
 // is not interrupted again) and jumps to 0x0004. That costs 2 cycles here, like a CALL
 // (the real chip needs 3-4 cycles of latency). RETFIE pops the PC and sets GIE again.
-// Sources so far: TMR0 overflow (T0IE / T0IF).
+// Sources so far: TMR0 overflow (T0IE / T0IF), RB0/INT edge (INTE / INTF),
+// RB7:RB4 change (RBIE / RBIF), EEPROM write complete (EEIE in INTCON / EEIF in EECON1).
 //
 // Not yet simulated: waking from SLEEP, watchdog.
 
@@ -33,8 +34,16 @@ const NOT_TO = 4;
 const INTCON = 0x0b;
 // INTCON bits
 const GIE = 7;
+const EEIE = 6;
 const T0IE = 5;
+const INTE = 4;
+const RBIE = 3;
 const T0IF = 2;
+const INTF = 1;
+const RBIF = 0;
+const EECON1 = 0x88;
+const EEIF = 4; // EECON1 bit: the only interrupt flag that is not in INTCON
+
 const ENABLE_BITS = 0x78; // EEIE, T0IE, INTE, RBIE (bits 6-3)
 
 const INTERRUPT_CYCLES = 2; // jump to the interrupt vector (see the comment at the top)
@@ -180,10 +189,10 @@ export class Cpu {
     this.cycles += cycles;
     this.memory.eepromController.tick(cycles); // EEPROM write in progress finishes after ~4 ms
     this.memory.timer0.tick(cycles);
+    this.memory.portbInterrupts.tick();
   }
 
   // GIE = 1 and at least one source is enabled: an interrupt can still come.
-  // Counts all enable bits, also those whose sources are not simulated yet (INTE, RBIE, EEIE).
   private interruptsEnabled(): boolean {
     const intcon = this.memory.peek(INTCON);
     return ((intcon >> GIE) & 1) === 1 && (intcon & ENABLE_BITS) !== 0;
@@ -194,7 +203,10 @@ export class Cpu {
     const intcon = this.memory.peek(INTCON);
     if (((intcon >> GIE) & 1) === 0) return false;
     const tmr0 = (intcon >> T0IE) & (intcon >> T0IF) & 1;
-    return tmr0 === 1;
+    const int = (intcon >> INTE) & (intcon >> INTF) & 1;
+    const rbChange = (intcon >> RBIE) & (intcon >> RBIF) & 1;
+    const eeprom = (intcon >> EEIE) & (this.memory.peek(EECON1) >> EEIF) & 1;
+    return (tmr0 | int | rbChange | eeprom) === 1;
   }
 
   // Runs one instruction; returns the extra cycles (taken skip / PCL write)
