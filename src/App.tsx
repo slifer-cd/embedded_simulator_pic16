@@ -22,6 +22,8 @@ import { Cpu } from "./simulator/cpu.ts";
 import type { CpuSnapshot, StepResult } from "./simulator/cpu.ts";
 import type { Drive } from "./simulator/pins.ts";
 import { downloadText } from "./utils/download.ts";
+import { DEFAULT_RUN_SPEED, RUN_SPEEDS } from "./utils/runSpeed.ts";
+import type { RunSpeed } from "./utils/runSpeed.ts";
 import { scrollLineIntoView, selectLine } from "./utils/selectLine.ts";
 import "./App.css";
 
@@ -43,7 +45,13 @@ const DEFAULT_FILE_NAME = "program"; // base name until a file is opened
 
 const DEFAULT_CLOCK_HZ = 4_000_000; // oscillator frequency (4 MHz -> 1 µs per instruction cycle)
 const RUN_TICK_MS = 16; // how often the screen updates while running (~60 times a second)
-const STEPS_PER_TICK = 1000; // instructions executed between screen updates
+const RUN_WORK_MS = 12; // at most this long simulating per tick, so the page stays responsive
+const RUN_CATCH_UP_MS = 100; // after a pause (e.g. a background tab) don't try to catch up more
+const RUN_RATE_MS = 500; // how often the measured speed (x real time) is updated
+
+// Where a Step Over / Step Out run stops: when the stack is back at "depth" and (if pc is
+// given) the PC is at "pc". Comparing the depth too makes recursive CALLs work.
+type RunTarget = { label: string; pc: number | null; depth: number; startCycles: number };
 
 // What to tell the user after a step (null = nothing). Any note also stops Run.
 function noteFor(step: StepResult, cpu: Cpu): SimNote | null {
@@ -111,6 +119,9 @@ function App() {
   const [running, setRunning] = useState(false);
   const [simNote, setSimNote] = useState<SimNote | null>(null); // last warning / info from the simulator
   const [clockHz, setClockHz] = useState(DEFAULT_CLOCK_HZ); // oscillator frequency (also set in the CPU)
+  const [runSpeed, setRunSpeed] = useState<RunSpeed>(DEFAULT_RUN_SPEED);
+  const [runRate, setRunRate] = useState<number | null>(null); // measured speed: 1 = real time
+  const [runTarget, setRunTarget] = useState<RunTarget | null>(null); // Step Over / Out in progress
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
@@ -190,6 +201,7 @@ function App() {
 
     // Load a successful build into the simulator (starts from reset)
     setRunning(false);
+    setRunTarget(null);
     setSimNote(null);
     if (newResult.success) {
       cpu.load(newResult.program, newResult.eeprom, newResult.config);
@@ -207,7 +219,26 @@ function App() {
 
   const handleRun = () => {
     setSimNote(null);
+    setRunRate(null); // measured again from the start of this run
+    setRunTarget(null); // Stop also ends a Step Over / Out
     setRunning(!running);
+  };
+
+  // Step Over: on a CALL, run the whole subroutine (at Max speed, Stop still works) and stop
+  // at the instruction after the CALL. On any other instruction it is a normal Step.
+  const handleStepOver = () => {
+    if (cpu.sleeping || cpu.nextInstruction?.mnemonic !== "CALL") {
+      handleStep();
+      return;
+    }
+    setSimNote(null);
+    setRunTarget({
+      label: "Step Over",
+      pc: (cpu.pc + 1) & 0x1fff,
+      depth: cpu.stack.depth,
+      startCycles: cpu.cycles,
+    });
+    setRunning(true);
   };
 
   // The user connects an input pin to high / low / nothing (works while running too)
@@ -216,8 +247,26 @@ function App() {
     showSnapshot(cpu.snapshot());
   };
 
+  // Step Out: run until the current subroutine (or interrupt routine) returns, and stop at
+  // the return address. With an empty stack there is nothing to return from.
+  const handleStepOut = () => {
+    if (cpu.stack.depth === 0) {
+      setSimNote({ kind: "info", text: "Step Out: not inside a subroutine (the stack is empty)." });
+      return;
+    }
+    setSimNote(null);
+    setRunTarget({
+      label: "Step Out",
+      pc: null, // any address: the first return to the level below
+      depth: cpu.stack.depth - 1,
+      startCycles: cpu.cycles,
+    });
+    setRunning(true);
+  };
+
   const handleReset = () => {
     setRunning(false);
+    setRunTarget(null);
     cpu.reset();
     setSnapshots({ now: cpu.snapshot(), before: null });
     setSimNote(null);
@@ -234,6 +283,11 @@ function App() {
   const handleMclr = () => {
     const inSleep = cpu.sleeping;
     cpu.reset("mclr");
+    if (runTarget) {
+      // The stack is cleared: a Step Over / Out can't reach its target any more
+      setRunTarget(null);
+      setRunning(false);
+    }
     showSnapshot(cpu.snapshot()); // highlight what the reset changed
     setSimNote({
       kind: "info",
@@ -243,26 +297,83 @@ function App() {
     });
   };
 
-  // Run loop: execute a batch of instructions, then update the screen.
-  // Stops on a warning (stack overflow, invalid instruction, ...), at an endless loop (GOTO $)
-  // or at SLEEP when nothing can wake the CPU (with the watchdog on it keeps running).
+  // Run loop: every tick, run what the speed allows for the time since the last tick, then
+  // update the screen. Stops on a warning (stack overflow, invalid instruction, ...), at an
+  // endless loop (GOTO $) or at SLEEP when nothing can wake the CPU.
   useEffect(() => {
     if (!isRunning) return;
 
+    const speedId = runTarget ? "max" : runSpeed; // Step Over / Out runs as fast as it can
+    const { perSecond } = RUN_SPEEDS.find((speed) => speed.id === speedId)!;
+    const cyclesPerSecond = clockHz / 4; // real time: one instruction cycle = 4 clocks
+    // last: time of the last tick; owed: instructions (fixed speeds) or cycles (real time) not run yet;
+    // rateStart / rateCycles: the window over which the actual speed is measured
+    const start = performance.now();
+    const pace = { last: start, owed: 0, rateStart: start, rateCycles: 0 };
+
     const id = setInterval(() => {
-      for (let i = 0; i < STEPS_PER_TICK; i++) {
+      const now = performance.now();
+      const seconds = Math.min(now - pace.last, RUN_CATCH_UP_MS) / 1000;
+      pace.last = now;
+
+      // What this tick may run
+      let maxSteps = Infinity;
+      let maxCycles = Infinity;
+      if (perSecond !== null) {
+        pace.owed += perSecond * seconds;
+        maxSteps = Math.floor(pace.owed);
+        pace.owed -= maxSteps;
+      } else if (speedId === "realtime") {
+        pace.owed = Math.min(
+          pace.owed + cyclesPerSecond * seconds,
+          cyclesPerSecond * (RUN_CATCH_UP_MS / 1000),
+        );
+        maxCycles = pace.owed;
+      }
+
+      const deadline = now + RUN_WORK_MS;
+      const startCycles = cpu.cycles;
+      let steps = 0;
+      while (steps < maxSteps && cpu.cycles - startCycles < maxCycles) {
+        // Too slow for this speed (or "max"): stop for this tick and let the page draw
+        if (steps % 1024 === 1023 && performance.now() > deadline) break;
         const note = noteFor(cpu.step(), cpu);
+        steps++;
         if (note) {
           setSimNote(note);
           setRunning(false);
+          setRunTarget(null);
+          break;
+        }
+        // Step Over / Out: back at the target?
+        const reached =
+          runTarget !== null &&
+          cpu.stack.depth === runTarget.depth &&
+          (runTarget.pc === null || cpu.pc === runTarget.pc);
+        if (reached) {
+          const cycles = cpu.cycles - runTarget.startCycles;
+          setSimNote({ kind: "info", text: `${runTarget.label}: ${cycles} cycles.` });
+          setRunning(false);
+          setRunTarget(null);
           break;
         }
       }
-      showSnapshot(cpu.snapshot());
+      const ran = cpu.cycles - startCycles;
+      if (speedId === "realtime") pace.owed -= ran;
+
+      // Actual speed: simulated time / wall-clock time, over the last RUN_RATE_MS
+      pace.rateCycles += ran;
+      if (now - pace.rateStart >= RUN_RATE_MS) {
+        setRunRate(pace.rateCycles / (cyclesPerSecond * ((now - pace.rateStart) / 1000)));
+        pace.rateStart = now;
+        pace.rateCycles = 0;
+      }
+
+      if (steps > 0) showSnapshot(cpu.snapshot());
     }, RUN_TICK_MS);
 
     return () => clearInterval(id);
-  }, [isRunning, cpu]);
+  }, [isRunning, cpu, runSpeed, clockHz, runTarget]);
 
   // Keep the next instruction visible in the editor while stepping / running
   useEffect(() => {
@@ -313,7 +424,11 @@ function App() {
         downloadProblem={downloadProblem}
         onRun={handleRun}
         onStep={handleStep}
+        onStepOver={handleStepOver}
+        onStepOut={handleStepOut}
         onReset={handleReset}
+        runSpeed={runSpeed}
+        onRunSpeedChange={setRunSpeed}
         onMclr={handleMclr}
         simulateProblem={canSimulate ? null : (errorProblem ?? "Assemble the code first")}
         running={isRunning}
@@ -326,6 +441,12 @@ function App() {
         clockHz={clockHz}
         onClockChange={handleClockChange}
         clockWarning={clockWarning}
+        runRate={
+          isRunning && !runTarget && (runSpeed === "realtime" || runSpeed === "max")
+            ? runRate
+            : null
+        }
+        behind={runSpeed === "realtime" && runRate !== null && runRate < 0.9}
       />
 
       <main className="workspace">

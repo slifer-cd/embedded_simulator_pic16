@@ -9,7 +9,17 @@ type StatusBarProps = {
   clockHz: number; // oscillator frequency, for the elapsed time
   onClockChange: (hz: number) => void;
   clockWarning: string | null; // the clock doesn't fit the oscillator mode in __CONFIG
+  runRate: number | null; // measured speed while running (1 = real time), null = not shown
+  behind: boolean; // Real time speed is set, but the simulator can't keep up
 };
+
+// x real time: 2 digits below 1, 1 digit up to 10, whole numbers above
+function formatRate(rate: number): string {
+  if (rate < 0.01) return "<×0.01";
+  if (rate < 1) return `×${rate.toFixed(2)}`;
+  if (rate < 10) return `×${rate.toFixed(1)}`;
+  return `×${Math.round(rate)}`;
+}
 
 // Common crystals / oscillators for the PIC16F84A (the -04 part runs up to 4 MHz, the -20 up to 20 MHz)
 const CLOCK_OPTIONS = [
@@ -33,7 +43,7 @@ function elapsedTime(cycles: number, clockHz: number): string {
 }
 
 export function StatusBar(props: StatusBarProps) {
-  const { sim, running, note, clockHz, onClockChange, clockWarning } = props;
+  const { sim, running, note, clockHz, onClockChange, clockWarning, runRate, behind } = props;
   // Changing the clock changes how long a cycle is (4 / f), not the cycle count.
   // The EEPROM write time and the watchdog period stay the same in ms.
   const clockSelect = (
@@ -68,6 +78,18 @@ export function StatusBar(props: StatusBarProps) {
       <span>W {hex(sim.w, 2)}</span>
       <span>Cycles {sim.cycles}</span>
       <span>Time {elapsedTime(sim.cycles, clockHz)}</span>
+      {runRate !== null && (
+        <span
+          className={`status-rate${behind ? " behind" : ""}`}
+          title={
+            behind
+              ? "The simulator can't run this clock in real time: it runs as fast as it can"
+              : "Simulated time / real time"
+          }
+        >
+          {formatRate(runRate)} real time{behind && " (can't keep up)"}
+        </span>
+      )}
       {clockSelect}
       {note && (
         <span className={`status-note ${note.kind}`}>

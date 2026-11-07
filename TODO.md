@@ -14,12 +14,12 @@ What is left to build, in planned order. See `ideas.md` for the full list of app
 - Interrupt sources: TMR0 overflow, RB0/INT edge (INTEDG), RB4–RB7 change (latched on PORTB reads), EEPROM write complete (EEIE)
 - Watchdog (on by default, 18 ms x postscaler), SLEEP wake-up (WDT, INT, RB change, EEPROM), power-on / MCLR / WDT resets with TO / PD and WRERR, MCLR button
 - Clock selector (32.768 kHz – 20 MHz) in the status bar; EEPROM write time and WDT period follow it; warning when the clock doesn't fit the `__CONFIG` oscillator mode
+- Run speed (10 / 100 / 1000 instr/s, Real time, Max) with the measured speed in the status bar; Step Over / Step Out
 - UI: new panel layout (simulator panels on top), obsidian / ice grey colours with a blue accent
 
 ## Simulator features (in planned order)
 
 - [ ] **7. Breakpoints** _(on hold)_: click a line number; later conditional and data breakpoints
-- [ ] **8. Run speed + Step Over / Step Out**
 - [ ] **9. Execution history / step back**
 
 ## Display and I/O

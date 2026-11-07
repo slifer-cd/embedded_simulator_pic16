@@ -12,8 +12,8 @@
 ; 1. Assemble, Run. The "wait" loop never runs CLRWDT: after 18 ms the WDT resets
 ;    the chip. Run stops with "Watchdog reset".
 ; 2. Run again: RB1 is on, and the program sleeps. Every 18 ms the WDT wakes it up
-;    (TO = 0, PD = 0): RB7 toggles and wakeups counts (RAM 0x0D). Run skips SLEEP
-;    time quickly, so the count goes up fast. Step to see one wake-up at a time.
+;    (TO = 0, PD = 0): RB7 toggles and wakeups counts (RAM 0x0D), about 55 times a
+;    second at Real time speed. Step to see one wake-up at a time.
 ; 3. Press MCLR while it sleeps: RB2 on (MCLR during SLEEP). After 18 ms of
 ;    "wait" the WDT resets it again.
 ;

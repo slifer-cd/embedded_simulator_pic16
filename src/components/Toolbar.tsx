@@ -1,4 +1,6 @@
 import { useRef } from "react";
+import { RUN_SPEEDS } from "../utils/runSpeed.ts";
+import type { RunSpeed } from "../utils/runSpeed.ts";
 
 export type OutputFile = "hex" | "lst" | "err";
 
@@ -11,7 +13,11 @@ type ToolbarProps = {
   downloadProblem: Record<OutputFile, string | null>; // why a download is disabled (null = enabled)
 
   onRun: () => void; // starts or stops running
+  runSpeed: RunSpeed;
+  onRunSpeedChange: (speed: RunSpeed) => void;
   onStep: () => void;
+  onStepOver: () => void; // on a CALL: run the subroutine and stop after it
+  onStepOut: () => void; // run until the current subroutine returns
   onReset: () => void; // power-on reset
   onMclr: () => void; // MCLR reset (the reset pin), keeps RAM and the port latches
   simulateProblem: string | null; // why simulation is disabled (null = enabled)
@@ -22,7 +28,9 @@ const OUTPUT_FILES: OutputFile[] = ["hex", "lst", "err"];
 
 export function Toolbar(props: ToolbarProps) {
   const { onOpen, onSave, onAssemble, onDownload, downloadProblem } = props;
-  const { onRun, onStep, onReset, onMclr, simulateProblem, running } = props;
+  const { onRun, runSpeed, onRunSpeedChange, onStep, onStepOver, onStepOut, onReset, onMclr } =
+    props;
+  const { simulateProblem, running } = props;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -77,6 +85,18 @@ export function Toolbar(props: ToolbarProps) {
         >
           {running ? "Stop" : "Run"}
         </button>
+        <select
+          className="run-speed"
+          value={runSpeed}
+          onChange={(e) => onRunSpeedChange(e.target.value as RunSpeed)}
+          title="Run speed. The simulated time is the same at every speed."
+        >
+          {RUN_SPEEDS.map((speed) => (
+            <option key={speed.id} value={speed.id}>
+              {speed.label}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           onClick={onStep}
@@ -84,6 +104,28 @@ export function Toolbar(props: ToolbarProps) {
           title={simulateProblem ?? undefined}
         >
           Step
+        </button>
+        <button
+          type="button"
+          onClick={onStepOver}
+          disabled={simulateProblem !== null || running}
+          title={
+            simulateProblem ??
+            "Step Over: on a CALL, run the whole subroutine and stop after it returns (Stop aborts it). Otherwise a normal Step."
+          }
+        >
+          Step Over
+        </button>
+        <button
+          type="button"
+          onClick={onStepOut}
+          disabled={simulateProblem !== null || running}
+          title={
+            simulateProblem ??
+            "Step Out: run until the current subroutine or interrupt routine returns, and stop at the return address (Stop aborts it)."
+          }
+        >
+          Step Out
         </button>
         <button
           type="button"

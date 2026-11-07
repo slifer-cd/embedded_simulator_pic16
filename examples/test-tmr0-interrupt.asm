@@ -4,8 +4,8 @@
 ;
 ; 1. Assemble, then press Run: it keeps running (GOTO $ with interrupts on is a
 ;    "wait for interrupts" loop), and RB0 in the Pins panel blinks.
-;    65536 cycles = 65.5 ms on the chip; Run is slower than real time, so on
-;    screen RB0 changes about twice a second.
+;    65536 cycles = 65.5 ms at 4 MHz, so at Real time speed RB0 changes about
+;    15 times a second. With the Clock at 32.768 kHz it changes every 8 s.
 ; 2. To Step through an interrupt, make it come sooner: set the OPTION_REG value
 ;    to B'11011000' (1:1) and replace CLRF TMR0 with MOVLW 0xF0 / MOVWF TMR0.
 ;    The first interrupt then comes on Step 20: the status bar says "Interrupt

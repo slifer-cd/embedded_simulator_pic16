@@ -44,6 +44,16 @@ button {
   cursor: pointer;
 }
 
+.run-speed {
+  font: inherit;
+  font-size: 14px;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  color: var(--text-h);
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -390,6 +400,10 @@ button:disabled {
 }
 
 .status-clock-warning {
+  color: var(--warning);
+}
+
+.status-rate.behind {
   color: var(--warning);
 }
 

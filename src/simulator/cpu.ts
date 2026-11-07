@@ -258,6 +258,11 @@ export class Cpu {
     };
   }
 
+  // The instruction the next step runs (undefined = not a valid instruction)
+  get nextInstruction(): Instruction | undefined {
+    return decodeInstruction(this.memory.program[this.pc % MEMORY.PROGRAM_SIZE]);
+  }
+
   // Oscillator frequency (see Memory.clockHz). Changing it doesn't reset anything.
   get clockHz(): number {
     return this.memory.clockHz;
