@@ -8,6 +8,8 @@
   --error: #dc2626;
   --warning: #d97706;
   --success: #16a34a;
+  --accent: #2563eb;
+  --current-line: rgba(37, 99, 235, 0.14);
 
   --sans: system-ui, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
@@ -29,6 +31,8 @@
     --error: #f87171;
     --warning: #fbbf24;
     --success: #4ade80;
+    --accent: #60a5fa;
+    --current-line: rgba(96, 165, 250, 0.18);
   }
 }
 

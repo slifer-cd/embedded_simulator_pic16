@@ -136,14 +136,37 @@ button:disabled {
   padding-bottom: 24px; /* extra room so it can scroll as far as the textarea (horizontal scrollbar) */
   border-right: 1px solid var(--border);
   overflow: hidden;
-  white-space: pre;
   text-align: right;
-  color: var(--text);
-  opacity: 0.6;
+  color: color-mix(in srgb, var(--text) 60%, transparent);
   user-select: none;
 }
 
+.editor-gutter .current {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Textarea + the current-line bar behind it */
+.editor-area {
+  position: relative;
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  font-size: 14px; /* so 1em = one line height unit for the bar position */
+}
+
+.editor-current {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1.5em;
+  background: var(--current-line);
+  border-left: 3px solid var(--accent);
+  pointer-events: none;
+}
+
 .editor {
+  position: relative; /* above the current-line bar */
   flex: 1;
   resize: none;
   border: none;
@@ -288,4 +311,44 @@ button:disabled {
 .flash-label {
   color: var(--text-h);
   font-weight: 600;
+}
+
+/* Simulator status bar */
+.status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-h);
+}
+
+.status-state {
+  font-family: var(--sans);
+  font-weight: 700;
+}
+
+.status-state.running {
+  color: var(--success);
+}
+
+.status-state.sleeping {
+  color: var(--warning);
+}
+
+.status-note {
+  font-family: var(--sans);
+}
+
+.status-note.warning {
+  color: var(--warning);
+}
+
+.status-note.info {
+  color: var(--accent);
 }

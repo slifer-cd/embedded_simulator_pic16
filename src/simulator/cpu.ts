@@ -32,6 +32,17 @@ export type StepResult = {
   instruction: Instruction | undefined; // undefined = not a valid instruction (ran as NOP)
   cycles: number; // cycles this instruction took
   warnings: string[]; // e.g. stack overflow
+  endlessLoop: boolean; // a GOTO that jumped to itself ("GOTO $"): the program is "finished"
+};
+
+// A copy of the CPU state at one moment, for the UI (the Cpu object itself keeps changing)
+export type CpuSnapshot = {
+  pc: number;
+  w: number;
+  cycles: number;
+  sleeping: boolean;
+  file: Uint8Array; // data memory by canonical address
+  stack: number[]; // valid return addresses, newest first
 };
 
 export class Cpu {
@@ -56,6 +67,17 @@ export class Cpu {
     this.setPc(MEMORY.RESET_VECTOR);
     this.cycles = 0;
     this.sleeping = false;
+  }
+
+  snapshot(): CpuSnapshot {
+    return {
+      pc: this.pc,
+      w: this.w,
+      cycles: this.cycles,
+      sleeping: this.sleeping,
+      file: this.memory.file.slice(),
+      stack: this.stack.entries(),
+    };
   }
 
   // ---------- Helpers ----------
@@ -89,7 +111,7 @@ export class Cpu {
     if (this.sleeping) {
       // Nothing wakes the chip yet (watchdog / interrupts come later): time just passes
       this.cycles += 1;
-      return { address, word, instruction, cycles: 1, warnings: ["Sleeping."] };
+      return { address, word, instruction, cycles: 1, warnings: ["Sleeping."], endlessLoop: false };
     }
 
     // Fetch: the PC already points to the next instruction while this one executes
@@ -106,7 +128,8 @@ export class Cpu {
     }
 
     this.cycles += cycles;
-    return { address, word, instruction, cycles, warnings };
+    const endlessLoop = instruction?.mnemonic === "GOTO" && this.pc === address;
+    return { address, word, instruction, cycles, warnings, endlessLoop };
   }
 
   // Runs one instruction; returns the extra cycles (taken skip / PCL write)
