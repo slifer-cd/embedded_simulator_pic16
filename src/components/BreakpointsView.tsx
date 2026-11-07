@@ -1,25 +1,35 @@
 // Breakpoints panel.
 //   Line breakpoints: line, address, the source line. Click a row to show the line in the
-//     editor, × to remove one.
+//     editor, × to remove one, "if…" to give it a condition (stop only when e.g. W = 05).
 //   Data breakpoints: stop when W / a register / a RAM byte changes or becomes a value.
 //     A small form adds them; × removes one.
 // Clear all removes both kinds.
 
 import { useState } from "react";
-import { dataBreakpointKey, dataBreakpointTargets, W_TARGET } from "../utils/dataBreakpoints.ts";
-import type { DataBreakpoint } from "../utils/dataBreakpoints.ts";
+import {
+  CONDITION_OPS,
+  dataBreakpointKey,
+  dataBreakpointTargets,
+  describeCondition,
+  W_TARGET,
+} from "../utils/dataBreakpoints.ts";
+import type { BreakCondition, ConditionOp, DataBreakpoint } from "../utils/dataBreakpoints.ts";
 
 export type BreakpointRow = {
   line: number;
   text: string; // the source line, trimmed
   address: number | null; // where Run stops; null = no instruction on this line (never stops)
+  condition: BreakCondition | null; // null = always stop
 };
+
+type NewCondition = { target: number; op: ConditionOp; value: number };
 
 type BreakpointsViewProps = {
   rows: BreakpointRow[]; // line breakpoints, sorted by line
   outdated: boolean; // code edited since the last assemble: addresses are not known
   onSelect: (line: number) => void;
   onRemove: (line: number) => void;
+  onSetCondition: (line: number, condition: NewCondition | null) => void;
   onClearAll: () => void;
   dataBreakpoints: DataBreakpoint[];
   ramNames: Map<number, string[]>; // RAM address -> variable names, for the target list
@@ -39,7 +49,7 @@ function parseHexByte(text: string): number | null {
 }
 
 export function BreakpointsView(props: BreakpointsViewProps) {
-  const { rows, outdated, onSelect, onRemove, onClearAll } = props;
+  const { rows, outdated, onSelect, onRemove, onSetCondition, onClearAll } = props;
   const { dataBreakpoints, ramNames, onAddData, onRemoveData } = props;
 
   // The "add a data breakpoint" form
@@ -48,6 +58,20 @@ export function BreakpointsView(props: BreakpointsViewProps) {
   const [valueText, setValueText] = useState("00");
   const value = parseHexByte(valueText);
   const canAdd = mode === "change" || value !== null;
+  const targets = dataBreakpointTargets(ramNames);
+
+  // The condition editor, open for one line at a time
+  const [editing, setEditing] = useState<number | null>(null);
+  const [condTarget, setCondTarget] = useState(W_TARGET);
+  const [condOp, setCondOp] = useState<ConditionOp>("=");
+  const [condText, setCondText] = useState("00");
+  const condValue = parseHexByte(condText);
+  const openEditor = (row: BreakpointRow) => {
+    setEditing(row.line);
+    setCondTarget(row.condition?.target ?? W_TARGET);
+    setCondOp(row.condition?.op ?? "=");
+    setCondText((row.condition?.value ?? 0).toString(16).toUpperCase().padStart(2, "0"));
+  };
 
   const total = rows.length + dataBreakpoints.length;
 
@@ -69,13 +93,31 @@ export function BreakpointsView(props: BreakpointsViewProps) {
       {rows.length > 0 && (
         <table className="breakpoints-table">
           <tbody>
-            {rows.map((row) => (
+            {rows.map((row) => [
               <tr key={row.line} onClick={() => onSelect(row.line)} title="Show this line">
                 <td className="breakpoints-line">{row.line}</td>
                 <td className="breakpoints-address">
                   {outdated ? "" : row.address === null ? "no instruction" : hex(row.address, 4)}
                 </td>
                 <td className="breakpoints-text">{row.text}</td>
+                <td>
+                  <button
+                    type="button"
+                    className={`breakpoints-if${row.condition ? " set" : ""}`}
+                    title={
+                      row.condition
+                        ? `Stops only if ${describeCondition(row.condition)}. Click to change.`
+                        : "Add a condition: stop only when e.g. W = 05"
+                    }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (editing === row.line) setEditing(null);
+                      else openEditor(row);
+                    }}
+                  >
+                    {row.condition ? `if ${describeCondition(row.condition)}` : "if…"}
+                  </button>
+                </td>
                 <td>
                   <button
                     type="button"
@@ -90,8 +132,75 @@ export function BreakpointsView(props: BreakpointsViewProps) {
                     ×
                   </button>
                 </td>
-              </tr>
-            ))}
+              </tr>,
+              editing === row.line && (
+                <tr key={`${row.line}-condition`} className="breakpoints-condition">
+                  <td />
+                  <td colSpan={4}>
+                    <form
+                      className="breakpoints-form inline"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (condValue === null) return;
+                        onSetCondition(row.line, {
+                          target: condTarget,
+                          op: condOp,
+                          value: condValue,
+                        });
+                        setEditing(null);
+                      }}
+                    >
+                      <span>Stop only if</span>
+                      <select
+                        value={condTarget}
+                        onChange={(e) => setCondTarget(Number(e.target.value))}
+                        aria-label="Register or RAM byte"
+                      >
+                        {targets.map((t) => (
+                          <option key={t.target} value={t.target}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={condOp}
+                        onChange={(e) => setCondOp(e.target.value as ConditionOp)}
+                        aria-label="Comparison"
+                      >
+                        {CONDITION_OPS.map((op) => (
+                          <option key={op} value={op}>
+                            {op}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        className={condValue === null ? "invalid" : undefined}
+                        value={condText}
+                        onChange={(e) => setCondText(e.target.value)}
+                        size={4}
+                        aria-label="Value (hex)"
+                        title="Value in hex: 1F, 0x1F or 1Fh"
+                      />
+                      <button type="submit" disabled={condValue === null}>
+                        Set
+                      </button>
+                      {row.condition && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSetCondition(row.line, null);
+                            setEditing(null);
+                          }}
+                          title="Remove the condition: always stop"
+                        >
+                          Always
+                        </button>
+                      )}
+                    </form>
+                  </td>
+                </tr>
+              ),
+            ])}
           </tbody>
         </table>
       )}
@@ -139,7 +248,7 @@ export function BreakpointsView(props: BreakpointsViewProps) {
           onChange={(e) => setTarget(Number(e.target.value))}
           aria-label="Register or RAM byte"
         >
-          {dataBreakpointTargets(ramNames).map((t) => (
+          {targets.map((t) => (
             <option key={t.target} value={t.target}>
               {t.label}
             </option>

@@ -14,11 +14,12 @@
 //   lines 1-2 deleted             -> breakpoint -> 3
 //   line 5 deleted                -> breakpoint removed
 
-export function moveBreakpoints(
+// breakpoints: line -> whatever belongs to the breakpoint (e.g. its condition), moved along
+export function moveBreakpoints<T>(
   oldText: string,
   newText: string,
-  breakpoints: ReadonlySet<number>,
-): ReadonlySet<number> {
+  breakpoints: ReadonlyMap<number, T>,
+): ReadonlyMap<number, T> {
   if (breakpoints.size === 0 || oldText === newText) return breakpoints;
 
   const oldLines = oldText.split("\n");
@@ -42,16 +43,16 @@ export function moveBreakpoints(
   const newChanged = newLines.length - top - bottom; // ... and after the edit
   const shift = newLines.length - oldLines.length;
 
-  const moved = new Set<number>();
-  for (const line of breakpoints) {
+  const moved = new Map<number, T>();
+  for (const [line, data] of breakpoints) {
     const index = line - 1; // 0-based
     if (index < top) {
-      moved.add(line); // above the edit
+      moved.set(line, data); // above the edit
     } else if (index >= top + oldChanged) {
-      moved.add(line + shift); // below the edit
+      moved.set(line + shift, data); // below the edit
     } else if (newChanged > 0) {
       const offset = Math.min(index - top, newChanged - 1); // inside the edited block
-      moved.add(top + offset + 1);
+      moved.set(top + offset + 1, data);
     } // else: the block was deleted, and the breakpoint with it
   }
   return moved;

@@ -29,12 +29,14 @@ import type { Drive } from "./simulator/pins.ts";
 import { downloadText } from "./utils/download.ts";
 import { moveBreakpoints } from "./utils/moveBreakpoints.ts";
 import {
+  conditionHolds,
   dataBreakpointHit,
   dataBreakpointKey,
+  describeCondition,
   targetName,
   W_TARGET,
 } from "./utils/dataBreakpoints.ts";
-import type { DataBreakpoint } from "./utils/dataBreakpoints.ts";
+import type { BreakCondition, ConditionOp, DataBreakpoint } from "./utils/dataBreakpoints.ts";
 import { DEFAULT_RUN_SPEED, RUN_SPEEDS } from "./utils/runSpeed.ts";
 import type { RunSpeed } from "./utils/runSpeed.ts";
 import { scrollLineIntoView, selectLine } from "./utils/selectLine.ts";
@@ -116,7 +118,10 @@ function stepInfo(step: StepResult, cpu: Cpu): SimNote | null {
 
 function App() {
   const [code, setCode] = useState(SAMPLE_CODE);
-  const [breakpoints, setBreakpoints] = useState<ReadonlySet<number>>(new Set()); // source lines
+  // Line breakpoints: source line -> condition (null = always stop)
+  const [breakpoints, setBreakpoints] = useState<ReadonlyMap<number, BreakCondition | null>>(
+    new Map(),
+  );
   const [bottomTab, setBottomTab] = useState("history"); // History / Breakpoints tab
   const [dataBreakpoints, setDataBreakpoints] = useState<DataBreakpoint[]>([]);
   const [fileName, setFileName] = useState(DEFAULT_FILE_NAME); // base name for .asm/.hex/.lst/.err
@@ -196,9 +201,10 @@ function App() {
     }
   }
   const sourceLines = code.split("\n");
-  const breakpointRows = [...breakpoints]
+  const breakpointRows = [...breakpoints.keys()]
     .sort((a, b) => a - b)
     .map((line) => ({
+      condition: breakpoints.get(line) ?? null,
       line,
       text: (sourceLines[line - 1] ?? "").trim(),
       address: addressByLine.get(line) ?? null,
@@ -296,9 +302,22 @@ function App() {
   // Set or clear a breakpoint on a source line (also while running)
   const handleToggleBreakpoint = (line: number) => {
     setBreakpoints((old) => {
-      const next = new Set(old);
+      const next = new Map(old);
       if (next.has(line)) next.delete(line);
-      else next.add(line);
+      else next.set(line, null);
+      return next;
+    });
+  };
+
+  // Give a line breakpoint a condition (null = always stop)
+  const handleSetCondition = (
+    line: number,
+    condition: { target: number; op: ConditionOp; value: number } | null,
+  ) => {
+    setBreakpoints((old) => {
+      if (!old.has(line)) return old;
+      const next = new Map(old);
+      next.set(line, condition && { ...condition, label: targetName(condition.target, ramNames) });
       return next;
     });
   };
@@ -409,12 +428,12 @@ function App() {
     const lineAt = new Map<number, number>(); // program address -> source line, for messages
     for (const word of result?.words ?? []) lineAt.set(word.address, word.line);
 
-    const breakAt = new Map<number, number>();
+    const breakAt = new Map<number, { line: number; condition: BreakCondition | null }>();
     const linesDone = new Set<number>();
     for (const word of result?.words ?? []) {
       if (word.address >= MEMORY.PROGRAM_SIZE || !breakpoints.has(word.line)) continue;
       if (linesDone.has(word.line)) continue;
-      breakAt.set(word.address, word.line);
+      breakAt.set(word.address, { line: word.line, condition: breakpoints.get(word.line) ?? null });
       linesDone.add(word.line);
     }
     const { perSecond } = RUN_SPEEDS.find((speed) => speed.id === speedId)!;
@@ -466,10 +485,19 @@ function App() {
         }
         // Breakpoint: stop BEFORE the instruction runs (checked after a step, so a run that
         // starts on a breakpoint moves on). Not while sleeping: the PC doesn't move then.
-        const breakLine = cpu.sleeping ? undefined : breakAt.get(cpu.pc);
-        if (breakLine !== undefined) {
+        // A conditional one only stops when its condition holds right now.
+        const brk = cpu.sleeping ? undefined : breakAt.get(cpu.pc);
+        const stopHere =
+          brk !== undefined &&
+          (brk.condition === null ||
+            conditionHolds(brk.condition, readTarget(brk.condition.target)));
+        if (brk && stopHere) {
           const address = cpu.pc.toString(16).toUpperCase().padStart(4, "0");
-          setSimNote({ kind: "info", text: `Breakpoint at line ${breakLine} (0x${address}).` });
+          const because = brk.condition ? `, ${describeCondition(brk.condition)}` : "";
+          setSimNote({
+            kind: "info",
+            text: `Breakpoint at line ${brk.line} (0x${address})${because}.`,
+          });
           setRunning(false);
           setRunTarget(null);
           break;
@@ -538,7 +566,7 @@ function App() {
     }
     const text = (await file.text()).replace(/\r\n?/g, "\n"); // textarea uses "\n" only
     setCode(text);
-    setBreakpoints(new Set()); // they belonged to the old file
+    setBreakpoints(new Map()); // they belonged to the old file
     setSavedCode(text);
     setFileName(file.name.replace(/\.[^.]*$/, "") || DEFAULT_FILE_NAME);
   };
@@ -682,8 +710,9 @@ function App() {
                   outdated={outdated}
                   onSelect={handleSelectLine}
                   onRemove={handleToggleBreakpoint}
+                  onSetCondition={handleSetCondition}
                   onClearAll={() => {
-                    setBreakpoints(new Set());
+                    setBreakpoints(new Map());
                     setDataBreakpoints([]);
                   }}
                   dataBreakpoints={dataBreakpoints}

@@ -45,3 +45,35 @@ export function targetName(target: number, ramNames: Map<number, string[]>): str
   if (reg) return reg.name;
   return ramNames.get(target)?.[0] ?? `RAM 0x${target.toString(16).toUpperCase().padStart(2, "0")}`;
 }
+
+// ---------- Conditions on line breakpoints ----------
+// A line breakpoint with a condition only stops when, at that moment (before the line
+// runs), the condition holds: e.g. "W = 05" or "count > 10".
+
+export const CONDITION_OPS = ["=", "≠", "<", ">"] as const;
+export type ConditionOp = (typeof CONDITION_OPS)[number];
+
+export type BreakCondition = {
+  target: number; // like DataBreakpoint.target (W_TARGET for W)
+  op: ConditionOp;
+  value: number;
+  label: string; // name of the target when it was set
+};
+
+export function conditionHolds(condition: BreakCondition, actual: number): boolean {
+  switch (condition.op) {
+    case "=":
+      return actual === condition.value;
+    case "≠":
+      return actual !== condition.value;
+    case "<":
+      return actual < condition.value;
+    case ">":
+      return actual > condition.value;
+  }
+}
+
+export function describeCondition(condition: BreakCondition): string {
+  const value = condition.value.toString(16).toUpperCase().padStart(2, "0");
+  return `${condition.label} ${condition.op} ${value}`;
+}

@@ -1,12 +1,14 @@
 import { useRef, useState } from "react";
 import type { KeyboardEvent, Ref } from "react";
+import { describeCondition } from "../utils/dataBreakpoints.ts";
+import type { BreakCondition } from "../utils/dataBreakpoints.ts";
 
 type CodeEditorProps = {
   code: string;
   onChange: (code: string) => void;
   currentLine?: number; // line of the instruction the simulator runs next (highlighted)
   ref?: Ref<HTMLTextAreaElement>; // lets the parent select lines (e.g. from a message)
-  breakpoints: ReadonlySet<number>; // lines with a breakpoint
+  breakpoints: ReadonlyMap<number, BreakCondition | null>; // line -> condition (null = always)
   codeLines: ReadonlySet<number> | null; // lines with an instruction (null = not assembled yet)
   onToggleBreakpoint: (line: number) => void;
 };
@@ -117,10 +119,12 @@ export function CodeEditor(props: CodeEditorProps) {
             A breakpoint on a line without an instruction can't stop anything: shown hollow. */}
         {lineNumbers.map((n) => {
           const breakpoint = breakpoints.has(n);
+          const condition = breakpoints.get(n) ?? null;
           const inactive = breakpoint && codeLines !== null && !codeLines.has(n);
           const classes = [
             n === currentLine ? "current" : "",
             breakpoint ? "breakpoint" : "",
+            condition ? "conditional" : "",
             inactive ? "inactive" : "",
           ];
           return (
@@ -131,9 +135,11 @@ export function CodeEditor(props: CodeEditorProps) {
               title={
                 inactive
                   ? "Breakpoint on a line without an instruction: it never stops. Click to remove."
-                  : breakpoint
-                    ? "Breakpoint: Run stops before this line. Click to remove."
-                    : "Click to set a breakpoint (or F9 in the editor)"
+                  : condition
+                    ? `Breakpoint if ${describeCondition(condition)}. Click to remove.`
+                    : breakpoint
+                      ? "Breakpoint: Run stops before this line. Click to remove."
+                      : "Click to set a breakpoint (or F9 in the editor)"
               }
             >
               {n}
