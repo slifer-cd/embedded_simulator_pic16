@@ -25,6 +25,7 @@ import type { HistoryEntry } from "./simulator/history.ts";
 import type { CpuSnapshot, StepResult } from "./simulator/cpu.ts";
 import type { Drive } from "./simulator/pins.ts";
 import { downloadText } from "./utils/download.ts";
+import { moveBreakpoints } from "./utils/moveBreakpoints.ts";
 import { DEFAULT_RUN_SPEED, RUN_SPEEDS } from "./utils/runSpeed.ts";
 import type { RunSpeed } from "./utils/runSpeed.ts";
 import { scrollLineIntoView, selectLine } from "./utils/selectLine.ts";
@@ -248,6 +249,12 @@ function App() {
     setRunning(!running);
   };
 
+  // Code edited: move the breakpoints with their lines (see utils/moveBreakpoints.ts)
+  const handleCodeChange = (next: string) => {
+    setBreakpoints(moveBreakpoints(code, next, breakpoints));
+    setCode(next);
+  };
+
   // Set or clear a breakpoint on a source line (also while running)
   const handleToggleBreakpoint = (line: number) => {
     setBreakpoints((old) => {
@@ -467,6 +474,7 @@ function App() {
     }
     const text = (await file.text()).replace(/\r\n?/g, "\n"); // textarea uses "\n" only
     setCode(text);
+    setBreakpoints(new Set()); // they belonged to the old file
     setSavedCode(text);
     setFileName(file.name.replace(/\.[^.]*$/, "") || DEFAULT_FILE_NAME);
   };
@@ -534,7 +542,7 @@ function App() {
           <CodeEditor
             ref={editorRef}
             code={code}
-            onChange={setCode}
+            onChange={handleCodeChange}
             currentLine={currentLine}
             breakpoints={breakpoints}
             codeLines={codeLines}
