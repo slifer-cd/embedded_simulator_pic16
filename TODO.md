@@ -23,6 +23,8 @@ What is left to build, in planned order. See `ideas.md` for the full list of app
 - Watch list (Watch tab next to Registers): W / registers / RAM variables in hex, decimal and binary; variable watches follow their name after re-assembling
 - Syntax highlighting in the editor (uses the assembler's lexer; a coloured layer behind the textarea)
 - UI: new panel layout (simulator panels on top), obsidian / ice grey colours with a blue accent
+- Esc leaves the editor, Flash rows reachable with the keyboard (Enter shows the line)
+- Stack examples (`test-stack.asm`, `test-stack-overflow.asm`), a real `README.md`, deploy to GitHub Pages on every push to `main`
 
 ## Simulator features (in planned order)
 
@@ -41,10 +43,3 @@ save / restore). Still without their own tests:
 
 - [ ] `history`, `logicTrace`
 - [ ] `utils/`: `moveBreakpoints`, `highlight`, `dataBreakpoints`, `chipPaths`, `board`
-
-## Small loose ends
-
-- [ ] **Esc** to leave the editor with the keyboard (Tab no longer does)
-- [ ] Flash rows can be clicked but not reached with the keyboard
-- [ ] Recreate the stack test programs in `examples/`
-- [ ] `README.md` is still the Vite template

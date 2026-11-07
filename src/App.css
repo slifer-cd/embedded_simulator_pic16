@@ -470,7 +470,8 @@ button:disabled {
   border-top: 1px solid var(--border);
 }
 
-.flash-table tbody tr:hover {
+.flash-table tbody tr:hover,
+.flash-table tbody tr:focus-visible {
   background: var(--code-bg);
 }
 

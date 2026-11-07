@@ -193,6 +193,11 @@ export function CodeEditor(props: CodeEditorProps) {
               onToggleBreakpoint(lineOf(code, e.currentTarget.selectionStart));
               return;
             }
+            // Tab indents, so Esc is the keyboard way out: the next Tab moves on from here
+            if (e.key === "Escape") {
+              e.currentTarget.blur();
+              return;
+            }
             handleTab(e);
           }}
           // keep the line numbers and the current-line bar scrolled together with the code

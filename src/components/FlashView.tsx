@@ -55,7 +55,15 @@ export function FlashView({ result, outdated, onSelectLine }: FlashViewProps) {
           </thead>
           <tbody>
             {words.map((w) => (
-              <tr key={w.address} onClick={() => onSelectLine(w.line)} title={`Line ${w.line}`}>
+              <tr
+                key={w.address}
+                tabIndex={0}
+                onClick={() => onSelectLine(w.line)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onSelectLine(w.line);
+                }}
+                title={`Line ${w.line}`}
+              >
                 <td>{hex(w.address, 4)}</td>
                 <td>{hex(w.value, 4)}</td>
                 <td className="flash-label">{labels.get(w.address)?.join(", ")}</td>
