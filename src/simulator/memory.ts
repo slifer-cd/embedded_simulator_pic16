@@ -11,10 +11,15 @@
 import { decodeConfig, MEMORY } from "../chip/config.ts";
 import { GPR_END, GPR_START, REGISTER_BY_NAME, REGISTERS } from "../chip/registers.ts";
 import { EepromController } from "./peripherals/eeprom.ts";
+import type { EepromControllerState } from "./peripherals/eeprom.ts";
 import { PortBInterrupts } from "./peripherals/portbInterrupts.ts";
+import type { PortBInterruptsState } from "./peripherals/portbInterrupts.ts";
 import { Timer0 } from "./peripherals/timer0.ts";
+import type { Timer0State } from "./peripherals/timer0.ts";
 import { Watchdog } from "./peripherals/watchdog.ts";
+import type { WatchdogState } from "./peripherals/watchdog.ts";
 import { Pins, portLevels } from "./pins.ts";
+import type { PinDrives } from "./pins.ts";
 
 const address = (name: string) => REGISTER_BY_NAME.get(name)!.address;
 
@@ -68,6 +73,20 @@ const RESET_AGAIN = ["PCL", "PCLATH", "OPTION_REG", "TRISA", "TRISB"].map((name)
 
 const WRERR_BIT = 3; // EECON1: a write was cut off by a reset
 const RBIF_BIT = 0; // INTCON
+
+// Everything in Memory that running a program can change (for Cpu.saveState).
+// Not in it: the program (fixed after loading), the clock and the watchdog on/off (settings).
+// The pin drives ARE in it: going back in time also puts the outside world back as it was,
+// so running forward again gives the same result.
+export type MemoryState = {
+  file: Uint8Array;
+  eeprom: Uint8Array;
+  drives: PinDrives;
+  eepromController: EepromControllerState;
+  timer0: Timer0State;
+  portbInterrupts: PortBInterruptsState;
+  watchdog: WatchdogState;
+};
 
 export class Memory {
   readonly program = new Uint16Array(MEMORY.PROGRAM_SIZE); // flash, 14-bit words
@@ -125,6 +144,39 @@ export class Memory {
     this.timer0.reset(); // also clears the prescaler
     this.portbInterrupts.reset();
     this.watchdog.clear();
+  }
+
+  // Fills "into" when given (no new objects: used by the history ring buffer)
+  save(into?: MemoryState): MemoryState {
+    if (!into) {
+      return {
+        file: this.file.slice(),
+        eeprom: this.eeprom.slice(),
+        drives: this.pins.copyDrives(),
+        eepromController: this.eepromController.save(),
+        timer0: this.timer0.save(),
+        portbInterrupts: this.portbInterrupts.save(),
+        watchdog: this.watchdog.save(),
+      };
+    }
+    into.file.set(this.file);
+    into.eeprom.set(this.eeprom);
+    this.pins.copyDrives(into.drives);
+    this.eepromController.save(into.eepromController);
+    this.timer0.save(into.timer0);
+    this.portbInterrupts.save(into.portbInterrupts);
+    this.watchdog.save(into.watchdog);
+    return into;
+  }
+
+  restore(state: MemoryState): void {
+    this.file.set(state.file);
+    this.eeprom.set(state.eeprom);
+    this.pins.restoreDrives(state.drives);
+    this.eepromController.restore(state.eepromController);
+    this.timer0.restore(state.timer0);
+    this.portbInterrupts.restore(state.portbInterrupts);
+    this.watchdog.restore(state.watchdog);
   }
 
   // ---------- Addressing ----------

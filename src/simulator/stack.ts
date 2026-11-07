@@ -13,6 +13,8 @@ const PC_MASK = 0x1fff; // 13-bit program counter
 export type PushResult = { overflow: boolean }; // true: the oldest return address was lost
 export type PopResult = { address: number; underflow: boolean }; // true: address is a leftover value
 
+export type StackState = { slots: Uint16Array; pointer: number; depth: number };
+
 export class Stack {
   readonly slots = new Uint16Array(MEMORY.STACK_DEPTH);
   pointer = 0; // slot the next push writes to (wraps 7 -> 0)
@@ -35,6 +37,21 @@ export class Stack {
     if (!underflow) this.depth--;
 
     return { address: this.slots[this.pointer], underflow };
+  }
+
+  // Fills "into" when given (no new objects: used by the history ring buffer)
+  save(into?: StackState): StackState {
+    if (!into) return { slots: this.slots.slice(), pointer: this.pointer, depth: this.depth };
+    into.slots.set(this.slots);
+    into.pointer = this.pointer;
+    into.depth = this.depth;
+    return into;
+  }
+
+  restore(state: StackState): void {
+    this.slots.set(state.slots);
+    this.pointer = state.pointer;
+    this.depth = state.depth;
   }
 
   // Power-on reset: pointer and depth back to 0 (slot contents are unknown on the chip; cleared here)

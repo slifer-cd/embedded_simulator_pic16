@@ -15,12 +15,12 @@ What is left to build, in planned order. See `ideas.md` for the full list of app
 - Watchdog (on by default, 18 ms x postscaler), SLEEP wake-up (WDT, INT, RB change, EEPROM), power-on / MCLR / WDT resets with TO / PD and WRERR, MCLR button
 - Clock selector (32.768 kHz – 20 MHz) in the status bar; EEPROM write time and WDT period follow it; warning when the clock doesn't fit the `__CONFIG` oscillator mode
 - Run speed (10 / 100 / 1000 instr/s, Real time, Max) with the measured speed in the status bar; Step Over / Step Out
+- Execution history: full chip state saved before every step (1000 steps, also during Run), Step Back, History panel (click a row to go back)
 - UI: new panel layout (simulator panels on top), obsidian / ice grey colours with a blue accent
 
 ## Simulator features (in planned order)
 
 - [ ] **7. Breakpoints** _(on hold)_: click a line number; later conditional and data breakpoints
-- [ ] **9. Execution history / step back**
 
 ## Display and I/O
 

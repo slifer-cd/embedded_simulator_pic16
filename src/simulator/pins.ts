@@ -103,7 +103,16 @@ export class Pins {
     this.drives[port][bit] = drive;
   }
 
-  copyDrives(): PinDrives {
-    return { a: [...this.drives.a], b: [...this.drives.b] };
+  // Fills "into" when given (no new arrays: used by the history ring buffer)
+  copyDrives(into?: PinDrives): PinDrives {
+    if (!into) return { a: [...this.drives.a], b: [...this.drives.b] };
+    for (let i = 0; i < this.drives.a.length; i++) into.a[i] = this.drives.a[i];
+    for (let i = 0; i < this.drives.b.length; i++) into.b[i] = this.drives.b[i];
+    return into;
+  }
+
+  restoreDrives(drives: PinDrives): void {
+    for (let i = 0; i < drives.a.length; i++) this.drives.a[i] = drives.a[i];
+    for (let i = 0; i < drives.b.length; i++) this.drives.b[i] = drives.b[i];
   }
 }

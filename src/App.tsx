@@ -6,6 +6,7 @@ import { generateHex } from "./assembler/output/hex.ts";
 import { generateLst } from "./assembler/output/lst.ts";
 import { CodeEditor } from "./components/CodeEditor.tsx";
 import { FlashView } from "./components/FlashView.tsx";
+import { HistoryView } from "./components/HistoryView.tsx";
 import { MemoryView } from "./components/MemoryView.tsx";
 import { MessagesView } from "./components/MessagesView.tsx";
 import { Panel } from "./components/Panel.tsx";
@@ -19,6 +20,8 @@ import type { OutputFile } from "./components/Toolbar.tsx";
 import { clockProblem, decodeConfig, MEMORY } from "./chip/config.ts";
 import { GPR_END, GPR_START } from "./chip/registers.ts";
 import { Cpu } from "./simulator/cpu.ts";
+import { History } from "./simulator/history.ts";
+import type { HistoryEntry } from "./simulator/history.ts";
 import type { CpuSnapshot, StepResult } from "./simulator/cpu.ts";
 import type { Drive } from "./simulator/pins.ts";
 import { downloadText } from "./utils/download.ts";
@@ -48,6 +51,8 @@ const RUN_TICK_MS = 16; // how often the screen updates while running (~60 times
 const RUN_WORK_MS = 12; // at most this long simulating per tick, so the page stays responsive
 const RUN_CATCH_UP_MS = 100; // after a pause (e.g. a background tab) don't try to catch up more
 const RUN_RATE_MS = 500; // how often the measured speed (x real time) is updated
+const HISTORY_SIZE = 1000; // steps that Step Back can undo
+const HISTORY_ROWS = 200; // newest steps listed in the History panel
 
 // Where a Step Over / Step Out run stops: when the stack is back at "depth" and (if pc is
 // given) the PC is at "pc". Comparing the depth too makes recursive CALLs work.
@@ -109,6 +114,16 @@ function App() {
 
   // Simulator: one Cpu object for the whole session; the UI shows snapshots of it
   const [cpu] = useState(() => new Cpu());
+  // States before the last steps, for Step Back (recorded before every step, also during Run)
+  const [history] = useState(() => new History(HISTORY_SIZE));
+  // What the History panel shows (a copy: the History object itself keeps changing)
+  const [historyView, setHistoryView] = useState<{ rows: HistoryEntry[]; length: number }>({
+    rows: [],
+    length: 0,
+  });
+  const showHistory = () => {
+    setHistoryView({ rows: history.entries(HISTORY_ROWS), length: history.length });
+  };
   // The latest snapshot ("now") and the one before it ("before", to highlight what changed)
   const [snapshots, setSnapshots] = useState<{
     now: CpuSnapshot;
@@ -205,6 +220,8 @@ function App() {
     setSimNote(null);
     if (newResult.success) {
       cpu.load(newResult.program, newResult.eeprom, newResult.config);
+      history.clear();
+      showHistory();
       setSnapshots({ now: cpu.snapshot(), before: null });
     } else {
       setSnapshots(null);
@@ -212,7 +229,10 @@ function App() {
   };
 
   const handleStep = () => {
+    history.record(cpu);
     const step = cpu.step();
+    history.noteStep(step);
+    showHistory();
     showSnapshot(cpu.snapshot());
     setSimNote(noteFor(step, cpu) ?? stepInfo(step, cpu));
   };
@@ -222,6 +242,22 @@ function App() {
     setRunRate(null); // measured again from the start of this run
     setRunTarget(null); // Stop also ends a Step Over / Out
     setRunning(!running);
+  };
+
+  // Step Back: restore the state before the last step (pin drives included, see MemoryState)
+  const handleStepBack = () => {
+    handleGoBack(1);
+  };
+
+  // Go back several steps at once (a click in the History panel)
+  const handleGoBack = (steps: number) => {
+    if (!history.back(cpu, steps)) return;
+    showHistory();
+    showSnapshot(cpu.snapshot());
+    setSimNote({
+      kind: "info",
+      text: `Stepped back (${history.length} more step${history.length === 1 ? "" : "s"} in the history).`,
+    });
   };
 
   // Step Over: on a CALL, run the whole subroutine (at Max speed, Stop still works) and stop
@@ -268,6 +304,8 @@ function App() {
     setRunning(false);
     setRunTarget(null);
     cpu.reset();
+    history.clear();
+    showHistory();
     setSnapshots({ now: cpu.snapshot(), before: null });
     setSimNote(null);
   };
@@ -337,7 +375,10 @@ function App() {
       while (steps < maxSteps && cpu.cycles - startCycles < maxCycles) {
         // Too slow for this speed (or "max"): stop for this tick and let the page draw
         if (steps % 1024 === 1023 && performance.now() > deadline) break;
-        const note = noteFor(cpu.step(), cpu);
+        history.record(cpu);
+        const step = cpu.step();
+        history.noteStep(step);
+        const note = noteFor(step, cpu);
         steps++;
         if (note) {
           setSimNote(note);
@@ -369,11 +410,14 @@ function App() {
         pace.rateCycles = 0;
       }
 
-      if (steps > 0) showSnapshot(cpu.snapshot());
+      if (steps > 0) {
+        showSnapshot(cpu.snapshot());
+        setHistoryView({ rows: history.entries(HISTORY_ROWS), length: history.length });
+      }
     }, RUN_TICK_MS);
 
     return () => clearInterval(id);
-  }, [isRunning, cpu, runSpeed, clockHz, runTarget]);
+  }, [isRunning, cpu, history, runSpeed, clockHz, runTarget]);
 
   // Keep the next instruction visible in the editor while stepping / running
   useEffect(() => {
@@ -424,6 +468,8 @@ function App() {
         downloadProblem={downloadProblem}
         onRun={handleRun}
         onStep={handleStep}
+        onStepBack={handleStepBack}
+        canStepBack={historyView.length > 0}
         onStepOver={handleStepOver}
         onStepOut={handleStepOut}
         onReset={handleReset}
@@ -495,6 +541,15 @@ function App() {
       <div className="bottom">
         <Panel title="Messages">
           <MessagesView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
+        </Panel>
+        <Panel title="History">
+          <HistoryView
+            rows={historyView.rows}
+            length={historyView.length}
+            capacity={HISTORY_SIZE}
+            onSelect={handleGoBack}
+            disabled={isRunning}
+          />
         </Panel>
         <Panel title="EEPROM">
           {canSimulate ? (

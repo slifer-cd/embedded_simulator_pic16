@@ -29,6 +29,9 @@ const INTEDG = 6; // OPTION_REG
 const INTF = 1; // INTCON
 const RBIF = 0; // INTCON
 
+// Hidden state (for saving / restoring the whole chip, see Cpu.saveState)
+export type PortBInterruptsState = { lastRb0: number; latchedHigh: number };
+
 export class PortBInterrupts {
   private readonly memory: Memory;
   private lastRb0 = 0; // RB0 pin level at the previous tick, to find edges
@@ -42,6 +45,17 @@ export class PortBInterrupts {
     const levels = this.memory.peek(PORTB);
     this.lastRb0 = (levels >> RB0) & 1;
     this.latchedHigh = levels & RB7_RB4; // start without a mismatch
+  }
+
+  // Fills "into" when given (no new objects: used by the history ring buffer)
+  save(into: PortBInterruptsState = { lastRb0: 0, latchedHigh: 0 }): PortBInterruptsState {
+    into.lastRb0 = this.lastRb0;
+    into.latchedHigh = this.latchedHigh;
+    return into;
+  }
+
+  restore(state: PortBInterruptsState): void {
+    ({ lastRb0: this.lastRb0, latchedHigh: this.latchedHigh } = state);
   }
 
   // An instruction read PORTB (called from Memory.read, not from the UI's peek)

@@ -27,8 +27,9 @@ import { MEMORY } from "../chip/config.ts";
 import { decodeInstruction } from "../chip/instructions.ts";
 import type { Instruction } from "../chip/instructions.ts";
 import { Memory, PCL, PCLATH, STATUS } from "./memory.ts";
-import type { ResetKind } from "./memory.ts";
+import type { MemoryState, ResetKind } from "./memory.ts";
 import { Stack } from "./stack.ts";
+import type { StackState } from "./stack.ts";
 import type { PinDrives } from "./pins.ts";
 
 const PC_MASK = 0x1fff; // 13-bit program counter
@@ -86,6 +87,18 @@ export type CpuSnapshot = {
   stack: number[]; // valid return addresses, newest first
 };
 
+// The complete chip state at one moment, including hidden counters (prescaler, watchdog,
+// EEPROM write in progress, ...): restoring it and running on gives exactly the same result.
+// Used for stepping back. (CpuSnapshot is the smaller copy the UI shows.)
+export type CpuState = {
+  w: number;
+  pc: number;
+  cycles: number;
+  sleeping: boolean;
+  memory: MemoryState;
+  stack: StackState;
+};
+
 export class Cpu {
   readonly memory = new Memory();
   readonly stack = new Stack();
@@ -127,6 +140,36 @@ export class Cpu {
       this.setFlag(NOT_TO, false);
       this.setFlag(NOT_PD, true);
     }
+  }
+
+  // Fills "into" when given: no new objects, so the history can save every step cheaply
+  saveState(into?: CpuState): CpuState {
+    if (!into) {
+      return {
+        w: this.w,
+        pc: this.pc,
+        cycles: this.cycles,
+        sleeping: this.sleeping,
+        memory: this.memory.save(),
+        stack: this.stack.save(),
+      };
+    }
+    into.w = this.w;
+    into.pc = this.pc;
+    into.cycles = this.cycles;
+    into.sleeping = this.sleeping;
+    this.memory.save(into.memory);
+    this.stack.save(into.stack);
+    return into;
+  }
+
+  restoreState(state: CpuState): void {
+    this.w = state.w;
+    this.pc = state.pc;
+    this.cycles = state.cycles;
+    this.sleeping = state.sleeping;
+    this.memory.restore(state.memory);
+    this.stack.restore(state.stack);
   }
 
   snapshot(): CpuSnapshot {

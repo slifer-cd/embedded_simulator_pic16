@@ -16,6 +16,8 @@ type ToolbarProps = {
   runSpeed: RunSpeed;
   onRunSpeedChange: (speed: RunSpeed) => void;
   onStep: () => void;
+  onStepBack: () => void; // undo the last step
+  canStepBack: boolean; // there is a step in the history
   onStepOver: () => void; // on a CALL: run the subroutine and stop after it
   onStepOut: () => void; // run until the current subroutine returns
   onReset: () => void; // power-on reset
@@ -30,7 +32,7 @@ export function Toolbar(props: ToolbarProps) {
   const { onOpen, onSave, onAssemble, onDownload, downloadProblem } = props;
   const { onRun, runSpeed, onRunSpeedChange, onStep, onStepOver, onStepOut, onReset, onMclr } =
     props;
-  const { simulateProblem, running } = props;
+  const { onStepBack, canStepBack, simulateProblem, running } = props;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -97,6 +99,19 @@ export function Toolbar(props: ToolbarProps) {
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={onStepBack}
+          disabled={simulateProblem !== null || running || !canStepBack}
+          title={
+            simulateProblem ??
+            (canStepBack
+              ? "Step Back: undo the last step (the last 1000 steps are kept, also from Run)"
+              : "Nothing to step back to yet")
+          }
+        >
+          Step Back
+        </button>
         <button
           type="button"
           onClick={onStep}

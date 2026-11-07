@@ -25,6 +25,10 @@ const PS_MASK = 0x07;
 // RC oscillator, so the period is fixed in ms: in cycles it follows the clock.
 const PERIOD_MS = 18;
 
+// Hidden state of the WDT (for saving / restoring the whole chip, see Cpu.saveState).
+// "enabled" is not in it: it comes from the configuration word, not from running.
+export type WatchdogState = { count: number; postscaler: number };
+
 export class Watchdog {
   private readonly memory: Memory;
   enabled = true; // configuration word WDTE (set by Memory.load)
@@ -33,6 +37,17 @@ export class Watchdog {
 
   constructor(memory: Memory) {
     this.memory = memory;
+  }
+
+  // Fills "into" when given (no new objects: used by the history ring buffer)
+  save(into: WatchdogState = { count: 0, postscaler: 0 }): WatchdogState {
+    into.count = this.count;
+    into.postscaler = this.postscaler;
+    return into;
+  }
+
+  restore(state: WatchdogState): void {
+    ({ count: this.count, postscaler: this.postscaler } = state);
   }
 
   // CLRWDT, SLEEP and any reset

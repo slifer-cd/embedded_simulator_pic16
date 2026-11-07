@@ -29,6 +29,14 @@ const EEPROM_MASK = 0x3f; // 64 bytes: EEADR wraps
 // Write time: typical 4 ms (4000 cycles at 4 MHz, 20,000 at 20 MHz)
 const WRITE_MS = 4;
 
+// Hidden state of the controller (for saving / restoring the whole chip, see Cpu.saveState)
+export type EepromControllerState = {
+  unlock: number;
+  cyclesLeft: number;
+  pendingAddress: number;
+  pendingData: number;
+};
+
 export class EepromController {
   private readonly memory: Memory;
   private unlock = 0; // 0 = locked, 1 = got 0x55, 2 = got 0xAA (WR may now be set)
@@ -47,6 +55,26 @@ export class EepromController {
     this.unlock = 0;
     this.cyclesLeft = 0;
     return interrupted;
+  }
+
+  // Fills "into" when given (no new objects: used by the history ring buffer)
+  save(
+    into: EepromControllerState = { unlock: 0, cyclesLeft: 0, pendingAddress: 0, pendingData: 0 },
+  ): EepromControllerState {
+    into.unlock = this.unlock;
+    into.cyclesLeft = this.cyclesLeft;
+    into.pendingAddress = this.pendingAddress;
+    into.pendingData = this.pendingData;
+    return into;
+  }
+
+  restore(state: EepromControllerState): void {
+    ({
+      unlock: this.unlock,
+      cyclesLeft: this.cyclesLeft,
+      pendingAddress: this.pendingAddress,
+      pendingData: this.pendingData,
+    } = state);
   }
 
   get writing(): boolean {

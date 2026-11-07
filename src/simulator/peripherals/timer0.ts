@@ -43,6 +43,9 @@ const PS_MASK = 0x07;
 // INTCON bits
 const T0IF = 2;
 
+// Hidden state of Timer0 (for saving / restoring the whole chip, see Cpu.saveState)
+export type Timer0State = { prescaler: number; inhibit: number; lastRa4: number };
+
 export class Timer0 {
   private readonly memory: Memory;
   private prescaler = 0; // cycles / edges counted toward the next TMR0 increment (not readable)
@@ -57,6 +60,18 @@ export class Timer0 {
     this.prescaler = 0;
     this.inhibit = 0;
     this.lastRa4 = this.ra4();
+  }
+
+  // Fills "into" when given (no new objects: used by the history ring buffer)
+  save(into: Timer0State = { prescaler: 0, inhibit: 0, lastRa4: 0 }): Timer0State {
+    into.prescaler = this.prescaler;
+    into.inhibit = this.inhibit;
+    into.lastRa4 = this.lastRa4;
+    return into;
+  }
+
+  restore(state: Timer0State): void {
+    ({ prescaler: this.prescaler, inhibit: this.inhibit, lastRa4: this.lastRa4 } = state);
   }
 
   // The program wrote TMR0 (the value is already stored).
