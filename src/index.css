@@ -5,6 +5,9 @@
   --panel-bg: #ffffff;
   --border: #d1d5db;
   --code-bg: #f9fafb;
+  --error: #dc2626;
+  --warning: #d97706;
+  --success: #16a34a;
 
   --sans: system-ui, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
@@ -23,6 +26,9 @@
     --panel-bg: #1a1b22;
     --border: #2e303a;
     --code-bg: #15161c;
+    --error: #f87171;
+    --warning: #fbbf24;
+    --success: #4ade80;
   }
 }
 

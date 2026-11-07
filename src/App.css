@@ -112,19 +112,130 @@ button:disabled {
   opacity: 0.6;
 }
 
-/* Code editor */
-.editor {
+/* Code editor: line-number gutter + textarea side by side.
+   Both must use the same font, size, line height and top padding so the numbers line up. */
+.editor-wrap {
   flex: 1;
+  display: flex;
   min-height: 380px;
-  resize: none;
-  border: none;
-  outline: none;
-  padding: 4px;
+  background: var(--code-bg);
+}
+
+.editor-gutter,
+.editor {
   font-family: var(--mono);
   font-size: 14px;
   line-height: 1.5;
+  padding-top: 4px;
+}
+
+.editor-gutter {
+  min-width: 3ch;
+  padding-right: 8px;
+  padding-left: 4px;
+  padding-bottom: 24px; /* extra room so it can scroll as far as the textarea (horizontal scrollbar) */
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  white-space: pre;
+  text-align: right;
+  color: var(--text);
+  opacity: 0.6;
+  user-select: none;
+}
+
+.editor {
+  flex: 1;
+  resize: none;
+  border: none;
+  outline: none;
+  padding-left: 8px;
+  padding-right: 4px;
+  padding-bottom: 4px;
   tab-size: 8;
   white-space: pre;
-  background: var(--code-bg);
+  background: transparent;
   color: var(--text-h);
+}
+
+/* Messages panel */
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  font-size: 13px;
+}
+
+.messages-summary {
+  margin: 0;
+  font-weight: 600;
+}
+
+.messages-outdated {
+  margin: 0;
+  padding: 4px 6px;
+  border-left: 3px solid var(--warning);
+  background: var(--code-bg);
+  color: var(--warning);
+}
+
+.messages-summary.success {
+  color: var(--success);
+}
+
+.messages-summary.error {
+  color: var(--error);
+}
+
+.messages-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.messages-list li {
+  border-top: 1px solid var(--border);
+}
+
+/* Each message is a button (click = jump to the line), styled as a plain row */
+.messages-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 4px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  text-align: left;
+}
+
+.messages-row:hover {
+  background: var(--code-bg);
+}
+
+.messages-line {
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+.messages-severity {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.messages-list .error .messages-severity {
+  color: var(--error);
+}
+
+.messages-list .warning .messages-severity {
+  color: var(--warning);
+}
+
+.messages-list .message .messages-severity {
+  color: var(--text);
 }

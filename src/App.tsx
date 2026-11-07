@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { assemble } from "./assembler/assembler.ts";
+import type { AssemblyResult } from "./assembler/assembler.ts";
 import { CodeEditor } from "./components/CodeEditor.tsx";
+import { MessagesView } from "./components/MessagesView.tsx";
 import { Panel } from "./components/Panel.tsx";
 import { Toolbar } from "./components/Toolbar.tsx";
+import { selectLine } from "./utils/selectLine.ts";
 import "./App.css";
 
 const SAMPLE_CODE = `        LIST    P=16F84A
@@ -20,10 +24,21 @@ loop    GOTO    loop
 
 function App() {
   const [code, setCode] = useState(SAMPLE_CODE);
+  const [result, setResult] = useState<AssemblyResult | null>(null); // null = not assembled yet
+  const [assembledCode, setAssembledCode] = useState(""); // the code the result was made from
 
-  // Temporary: Step 4 replaces this with a call to assemble(code)
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+
+  // The result is out of date when the code was edited after the last assemble
+  const outdated = result !== null && code !== assembledCode;
+
   const handleAssemble = () => {
-    console.log("Assemble clicked", code.split("\n").length, "lines");
+    setResult(assemble(code));
+    setAssembledCode(code);
+  };
+
+  const handleSelectLine = (line: number) => {
+    if (editorRef.current) selectLine(editorRef.current, line);
   };
 
   return (
@@ -32,7 +47,7 @@ function App() {
 
       <main className="workspace">
         <Panel title="Code">
-          <CodeEditor code={code} onChange={setCode} />
+          <CodeEditor ref={editorRef} code={code} onChange={setCode} />
         </Panel>
 
         <Panel title="Chip" />
@@ -48,7 +63,9 @@ function App() {
         <Panel title="RAM" />
         <Panel title="Flash" />
         <Panel title="EEPROM" />
-        <Panel title="Messages" />
+        <Panel title="Messages">
+          <MessagesView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
+        </Panel>
       </div>
     </div>
   );
