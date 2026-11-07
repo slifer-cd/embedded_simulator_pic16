@@ -16,11 +16,12 @@ What is left to build, in planned order. See `ideas.md` for the full list of app
 - Clock selector (32.768 kHz – 20 MHz) in the status bar; EEPROM write time and WDT period follow it; warning when the clock doesn't fit the `__CONFIG` oscillator mode
 - Run speed (10 / 100 / 1000 instr/s, Real time, Max) with the measured speed in the status bar; Step Over / Step Out
 - Execution history: full chip state saved before every step (1000 steps, also during Run), Step Back, History panel (click a row to go back)
+- Breakpoints: click a line number or F9; Run / Step Over / Step Out stop before the line (hollow mark = line without an instruction)
 - UI: new panel layout (simulator panels on top), obsidian / ice grey colours with a blue accent
 
 ## Simulator features (in planned order)
 
-- [ ] **7. Breakpoints** _(on hold)_: click a line number; later conditional and data breakpoints
+- [ ] **7. Breakpoints, more**: keep them on their lines while editing; clear all / a list; conditional (e.g. W = 5) and data breakpoints (a register changes)
 
 ## Display and I/O
 

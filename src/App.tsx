@@ -106,6 +106,7 @@ function stepInfo(step: StepResult, cpu: Cpu): SimNote | null {
 
 function App() {
   const [code, setCode] = useState(SAMPLE_CODE);
+  const [breakpoints, setBreakpoints] = useState<ReadonlySet<number>>(new Set()); // source lines
   const [fileName, setFileName] = useState(DEFAULT_FILE_NAME); // base name for .asm/.hex/.lst/.err
   const [savedCode, setSavedCode] = useState(SAMPLE_CODE); // code as last opened / saved
   const unsaved = code !== savedCode;
@@ -172,6 +173,9 @@ function App() {
   for (const word of result?.words ?? []) {
     if (word.address < MEMORY.PROGRAM_SIZE) lineByAddress.set(word.address, word.line);
   }
+  // Lines with an instruction in the last build (null = nothing assembled), for breakpoint marks
+  const codeLines = result ? new Set(lineByAddress.values()) : null;
+
   // Program address -> label name (first label if there are several), for the Stack panel
   const labelByAddress = new Map<number, string>();
   for (const [name, symbol] of result?.symbols ?? []) {
@@ -242,6 +246,16 @@ function App() {
     setRunRate(null); // measured again from the start of this run
     setRunTarget(null); // Stop also ends a Step Over / Out
     setRunning(!running);
+  };
+
+  // Set or clear a breakpoint on a source line (also while running)
+  const handleToggleBreakpoint = (line: number) => {
+    setBreakpoints((old) => {
+      const next = new Set(old);
+      if (next.has(line)) next.delete(line);
+      else next.add(line);
+      return next;
+    });
   };
 
   // Step Back: restore the state before the last step (pin drives included, see MemoryState)
@@ -342,6 +356,16 @@ function App() {
     if (!isRunning) return;
 
     const speedId = runTarget ? "max" : runSpeed; // Step Over / Out runs as fast as it can
+
+    // Breakpoints: program address -> source line (the first word of each breakpoint line)
+    const breakAt = new Map<number, number>();
+    const linesDone = new Set<number>();
+    for (const word of result?.words ?? []) {
+      if (word.address >= MEMORY.PROGRAM_SIZE || !breakpoints.has(word.line)) continue;
+      if (linesDone.has(word.line)) continue;
+      breakAt.set(word.address, word.line);
+      linesDone.add(word.line);
+    }
     const { perSecond } = RUN_SPEEDS.find((speed) => speed.id === speedId)!;
     const cyclesPerSecond = clockHz / 4; // real time: one instruction cycle = 4 clocks
     // last: time of the last tick; owed: instructions (fixed speeds) or cycles (real time) not run yet;
@@ -386,6 +410,16 @@ function App() {
           setRunTarget(null);
           break;
         }
+        // Breakpoint: stop BEFORE the instruction runs (checked after a step, so a run that
+        // starts on a breakpoint moves on). Not while sleeping: the PC doesn't move then.
+        const breakLine = cpu.sleeping ? undefined : breakAt.get(cpu.pc);
+        if (breakLine !== undefined) {
+          const address = cpu.pc.toString(16).toUpperCase().padStart(4, "0");
+          setSimNote({ kind: "info", text: `Breakpoint at line ${breakLine} (0x${address}).` });
+          setRunning(false);
+          setRunTarget(null);
+          break;
+        }
         // Step Over / Out: back at the target?
         const reached =
           runTarget !== null &&
@@ -417,7 +451,7 @@ function App() {
     }, RUN_TICK_MS);
 
     return () => clearInterval(id);
-  }, [isRunning, cpu, history, runSpeed, clockHz, runTarget]);
+  }, [isRunning, cpu, history, runSpeed, clockHz, runTarget, breakpoints, result]);
 
   // Keep the next instruction visible in the editor while stepping / running
   useEffect(() => {
@@ -497,7 +531,15 @@ function App() {
 
       <main className="workspace">
         <Panel title={`Code · ${fileName}.asm${unsaved ? " •" : ""}`}>
-          <CodeEditor ref={editorRef} code={code} onChange={setCode} currentLine={currentLine} />
+          <CodeEditor
+            ref={editorRef}
+            code={code}
+            onChange={setCode}
+            currentLine={currentLine}
+            breakpoints={breakpoints}
+            codeLines={codeLines}
+            onToggleBreakpoint={handleToggleBreakpoint}
+          />
         </Panel>
 
         <Panel title="Registers">

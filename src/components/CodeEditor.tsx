@@ -6,6 +6,9 @@ type CodeEditorProps = {
   onChange: (code: string) => void;
   currentLine?: number; // line of the instruction the simulator runs next (highlighted)
   ref?: Ref<HTMLTextAreaElement>; // lets the parent select lines (e.g. from a message)
+  breakpoints: ReadonlySet<number>; // lines with a breakpoint
+  codeLines: ReadonlySet<number> | null; // lines with an instruction (null = not assembled yet)
+  onToggleBreakpoint: (line: number) => void;
 };
 
 const LINE_HEIGHT_EM = 1.5; // must match line-height in App.css (.editor)
@@ -92,7 +95,15 @@ function handleTab(e: KeyboardEvent<HTMLTextAreaElement>): void {
   replaceSelection(textarea, " ".repeat(TAB_SIZE - (column % TAB_SIZE)));
 }
 
-export function CodeEditor({ code, onChange, currentLine, ref }: CodeEditorProps) {
+// Line (1-based) of a position in the text
+function lineOf(text: string, position: number): number {
+  let line = 1;
+  for (let i = 0; i < position; i++) if (text[i] === "\n") line++;
+  return line;
+}
+
+export function CodeEditor(props: CodeEditorProps) {
+  const { code, onChange, currentLine, ref, breakpoints, codeLines, onToggleBreakpoint } = props;
   const gutterRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
 
@@ -102,11 +113,33 @@ export function CodeEditor({ code, onChange, currentLine, ref }: CodeEditorProps
   return (
     <div className="editor-wrap">
       <div className="editor-gutter" ref={gutterRef} aria-hidden="true">
-        {lineNumbers.map((n) => (
-          <div key={n} className={n === currentLine ? "current" : undefined}>
-            {n}
-          </div>
-        ))}
+        {/* Click a line number to set / clear a breakpoint (F9 does the same for the cursor's line).
+            A breakpoint on a line without an instruction can't stop anything: shown hollow. */}
+        {lineNumbers.map((n) => {
+          const breakpoint = breakpoints.has(n);
+          const inactive = breakpoint && codeLines !== null && !codeLines.has(n);
+          const classes = [
+            n === currentLine ? "current" : "",
+            breakpoint ? "breakpoint" : "",
+            inactive ? "inactive" : "",
+          ];
+          return (
+            <div
+              key={n}
+              className={classes.join(" ").trim() || undefined}
+              onClick={() => onToggleBreakpoint(n)}
+              title={
+                inactive
+                  ? "Breakpoint on a line without an instruction: it never stops. Click to remove."
+                  : breakpoint
+                    ? "Breakpoint: Run stops before this line. Click to remove."
+                    : "Click to set a breakpoint (or F9 in the editor)"
+              }
+            >
+              {n}
+            </div>
+          );
+        })}
       </div>
 
       <div className="editor-area">
@@ -122,7 +155,14 @@ export function CodeEditor({ code, onChange, currentLine, ref }: CodeEditorProps
           className="editor"
           value={code}
           onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleTab}
+          onKeyDown={(e) => {
+            if (e.key === "F9") {
+              e.preventDefault();
+              onToggleBreakpoint(lineOf(code, e.currentTarget.selectionStart));
+              return;
+            }
+            handleTab(e);
+          }}
           // keep the line numbers and the current-line bar scrolled together with the code
           onScroll={(e) => {
             const top = e.currentTarget.scrollTop;

@@ -184,6 +184,45 @@ button:disabled {
   font-weight: 700;
 }
 
+/* Each line number can be clicked to set a breakpoint; the dot sits left of the number */
+.editor-gutter div {
+  position: relative;
+  padding-left: 14px;
+  cursor: pointer;
+}
+
+.editor-gutter div:hover::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: color-mix(in srgb, var(--error) 35%, transparent);
+}
+
+.editor-gutter .breakpoint::before,
+.editor-gutter .breakpoint:hover::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: var(--error);
+}
+
+/* Breakpoint on a line without an instruction: never stops */
+.editor-gutter .breakpoint.inactive::before {
+  background: transparent;
+  border: 1.5px solid var(--error);
+  box-sizing: border-box;
+}
+
 /* Textarea + the current-line bar behind it */
 .editor-area {
   position: relative;
