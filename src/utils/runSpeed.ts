@@ -17,4 +17,4 @@ export const RUN_SPEEDS = [
 
 export type RunSpeed = (typeof RUN_SPEEDS)[number]["id"];
 
-export const DEFAULT_RUN_SPEED: RunSpeed = "realtime";
+export const DEFAULT_RUN_SPEED: RunSpeed = "10"; // slow enough to follow the code line by line

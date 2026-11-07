@@ -7,6 +7,8 @@ import { generateLst } from "./assembler/output/lst.ts";
 import { CodeEditor } from "./components/CodeEditor.tsx";
 import { FlashView } from "./components/FlashView.tsx";
 import { BreakpointsView } from "./components/BreakpointsView.tsx";
+import { ChipView } from "./components/ChipView.tsx";
+import { disassemble } from "./chip/disassembler.ts";
 import { HistoryView } from "./components/HistoryView.tsx";
 import { TabbedPanel } from "./components/TabbedPanel.tsx";
 import { MemoryView } from "./components/MemoryView.tsx";
@@ -123,6 +125,7 @@ function App() {
     new Map(),
   );
   const [bottomTab, setBottomTab] = useState("history"); // History / Breakpoints tab
+  const [mainTab, setMainTab] = useState("code"); // Code / Chip tab
   const [dataBreakpoints, setDataBreakpoints] = useState<DataBreakpoint[]>([]);
   const [fileName, setFileName] = useState(DEFAULT_FILE_NAME); // base name for .asm/.hex/.lst/.err
   const [savedCode, setSavedCode] = useState(SAMPLE_CODE); // code as last opened / saved
@@ -588,8 +591,12 @@ function App() {
     downloadText(`${fileName}.${file}`, content);
   };
 
+  // Show a line in the editor (switches to the Code tab first, so it can scroll there)
   const handleSelectLine = (line: number) => {
-    if (editorRef.current) selectLine(editorRef.current, line);
+    setMainTab("code");
+    requestAnimationFrame(() => {
+      if (editorRef.current) selectLine(editorRef.current, line);
+    });
   };
 
   return (
@@ -630,17 +637,44 @@ function App() {
       />
 
       <main className="workspace">
-        <Panel title={`Code · ${fileName}.asm${unsaved ? " •" : ""}`}>
-          <CodeEditor
-            ref={editorRef}
-            code={code}
-            onChange={handleCodeChange}
-            currentLine={currentLine}
-            breakpoints={breakpoints}
-            codeLines={codeLines}
-            onToggleBreakpoint={handleToggleBreakpoint}
-          />
-        </Panel>
+        <TabbedPanel
+          keepMounted
+          selected={mainTab}
+          onSelect={setMainTab}
+          tabs={[
+            {
+              id: "code",
+              label: `Code · ${fileName}.asm${unsaved ? " •" : ""}`,
+              content: (
+                <CodeEditor
+                  ref={editorRef}
+                  code={code}
+                  onChange={handleCodeChange}
+                  currentLine={currentLine}
+                  breakpoints={breakpoints}
+                  codeLines={codeLines}
+                  onToggleBreakpoint={handleToggleBreakpoint}
+                />
+              ),
+            },
+            {
+              id: "chip",
+              label: "Chip",
+              content: (
+                <ChipView
+                  sim={canSimulate ? sim : null}
+                  previous={canSimulate ? previousSim : null}
+                  instruction={
+                    canSimulate && result
+                      ? disassemble(result.program[sim.pc % MEMORY.PROGRAM_SIZE])
+                      : null
+                  }
+                  clockHz={clockHz}
+                />
+              ),
+            },
+          ]}
+        />
 
         <Panel title="Registers">
           <RegistersView sim={canSimulate ? sim : null} previous={previousSim} />
@@ -737,7 +771,6 @@ function App() {
             <p className="todo">Assemble to load a program</p>
           )}
         </Panel>
-        <Panel title="Chip" />
       </div>
     </div>
   );

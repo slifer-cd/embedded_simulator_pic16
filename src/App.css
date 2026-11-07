@@ -88,10 +88,10 @@ button:disabled {
   flex: 1.4;
 }
 
-/* Bottom area: messages | history | EEPROM | chip */
+/* Bottom area: messages | history / breakpoints | EEPROM */
 .bottom {
   display: grid;
-  grid-template-columns: 1.6fr 1.4fr 1fr 0.8fr;
+  grid-template-columns: 1.6fr 1.4fr 1fr;
   gap: 12px;
   min-height: 200px;
 }
@@ -156,6 +156,10 @@ button:disabled {
 .panel-tabs button.selected {
   color: var(--text-h);
   border-bottom-color: var(--accent);
+}
+
+.panel-body[hidden] {
+  display: none;
 }
 
 .panel-body {
@@ -617,6 +621,83 @@ button:disabled {
 
 .breakpoints-remove:hover {
   color: var(--error);
+}
+
+/* Chip block diagram (ChipView): theme colours, so it works in light and dark mode */
+.chip-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.chip-view svg {
+  width: 100%;
+  height: 100%;
+}
+
+.chip-frame,
+.chip-group {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
+.chip-block rect,
+.chip-shape {
+  fill: var(--panel-bg);
+  stroke: var(--text-h);
+  stroke-width: 2;
+}
+
+.chip-block.changed rect {
+  fill: var(--current-line);
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.chip-title {
+  fill: var(--text-h);
+  font-family: var(--sans);
+  font-size: 21px;
+}
+
+.chip-value {
+  fill: var(--text-h);
+  font-family: var(--mono);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.chip-block.changed .chip-value {
+  fill: var(--accent);
+}
+
+.chip-note,
+.chip-label {
+  fill: var(--text);
+  font-family: var(--sans);
+  font-size: 18px;
+}
+
+.chip-bus {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 3;
+}
+
+.chip-arrowhead {
+  fill: var(--text);
+}
+
+.chip-pin rect,
+.chip-pin path {
+  fill: var(--panel-bg);
+  stroke: var(--text-h);
+  stroke-width: 2;
+}
+
+.chip-pin.high rect {
+  fill: var(--success);
 }
 
 /* Simulator status bar */
