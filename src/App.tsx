@@ -1,5 +1,7 @@
 import { useState } from "react";
-import type { ReactNode } from "react";
+import { CodeEditor } from "./components/CodeEditor.tsx";
+import { Panel } from "./components/Panel.tsx";
+import { Toolbar } from "./components/Toolbar.tsx";
 import "./App.css";
 
 const SAMPLE_CODE = `        LIST    P=16F84A
@@ -16,56 +18,21 @@ loop    GOTO    loop
         END
 `;
 
-function Panel({ title, children }: { title: string; children?: ReactNode }) {
-  return (
-    <section className="panel">
-      <h2>{title}</h2>
-      <div className="panel-body">{children ?? <p className="todo">Coming soon</p>}</div>
-    </section>
-  );
-}
-
 function App() {
   const [code, setCode] = useState(SAMPLE_CODE);
 
+  // Temporary: Step 4 replaces this with a call to assemble(code)
+  const handleAssemble = () => {
+    console.log("Assemble clicked", code.split("\n").length, "lines");
+  };
+
   return (
     <div className="app">
-      <header className="toolbar">
-        <h1>PIC16F84A Simulator</h1>
-        <div className="buttons">
-          <button type="button" disabled>
-            Assemble
-          </button>
-          <button type="button" disabled>
-            .hex
-          </button>
-          <button type="button" disabled>
-            .lst
-          </button>
-          <button type="button" disabled>
-            .err
-          </button>
-          <span className="separator" />
-          <button type="button" disabled>
-            Run
-          </button>
-          <button type="button" disabled>
-            Step
-          </button>
-          <button type="button" disabled>
-            Reset
-          </button>
-        </div>
-      </header>
+      <Toolbar onAssemble={handleAssemble} />
 
       <main className="workspace">
         <Panel title="Code">
-          <textarea
-            className="editor"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            spellCheck={false}
-          />
+          <CodeEditor code={code} onChange={setCode} />
         </Panel>
 
         <Panel title="Chip" />
