@@ -135,6 +135,29 @@ button:disabled {
   border-bottom: 1px solid var(--border);
 }
 
+/* Tabbed panel header: tabs look like the panel title */
+.panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-tabs button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--text) 80%, transparent);
+}
+
+.panel-tabs button.selected {
+  color: var(--text-h);
+  border-bottom-color: var(--accent);
+}
+
 .panel-body {
   flex: 1;
   display: flex;
@@ -455,6 +478,75 @@ button:disabled {
 .history-event {
   font-family: var(--sans);
   color: var(--accent);
+}
+
+/* Breakpoints panel */
+.breakpoints {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.breakpoints-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.breakpoints-header button {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.breakpoints-table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.breakpoints-table tr {
+  cursor: pointer;
+  border-top: 1px solid var(--border);
+}
+
+.breakpoints-table tr:hover {
+  background: var(--code-bg);
+}
+
+.breakpoints-table td {
+  padding: 2px 8px 2px 0;
+  white-space: nowrap;
+}
+
+.breakpoints-line {
+  color: var(--error);
+  font-weight: 700;
+  text-align: right;
+}
+
+.breakpoints-address {
+  color: color-mix(in srgb, var(--text) 70%, transparent);
+  font-family: var(--sans);
+}
+
+.breakpoints-text {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 0; /* let the source text shrink instead of widening the panel */
+}
+
+.breakpoints-remove {
+  padding: 0 6px;
+  border: none;
+  background: none;
+  color: color-mix(in srgb, var(--text) 70%, transparent);
+  font-size: 14px;
+}
+
+.breakpoints-remove:hover {
+  color: var(--error);
 }
 
 /* Simulator status bar */

@@ -6,7 +6,9 @@ import { generateHex } from "./assembler/output/hex.ts";
 import { generateLst } from "./assembler/output/lst.ts";
 import { CodeEditor } from "./components/CodeEditor.tsx";
 import { FlashView } from "./components/FlashView.tsx";
+import { BreakpointsView } from "./components/BreakpointsView.tsx";
 import { HistoryView } from "./components/HistoryView.tsx";
+import { TabbedPanel } from "./components/TabbedPanel.tsx";
 import { MemoryView } from "./components/MemoryView.tsx";
 import { MessagesView } from "./components/MessagesView.tsx";
 import { Panel } from "./components/Panel.tsx";
@@ -108,6 +110,7 @@ function stepInfo(step: StepResult, cpu: Cpu): SimNote | null {
 function App() {
   const [code, setCode] = useState(SAMPLE_CODE);
   const [breakpoints, setBreakpoints] = useState<ReadonlySet<number>>(new Set()); // source lines
+  const [bottomTab, setBottomTab] = useState("history"); // History / Breakpoints tab
   const [fileName, setFileName] = useState(DEFAULT_FILE_NAME); // base name for .asm/.hex/.lst/.err
   const [savedCode, setSavedCode] = useState(SAMPLE_CODE); // code as last opened / saved
   const unsaved = code !== savedCode;
@@ -176,6 +179,22 @@ function App() {
   }
   // Lines with an instruction in the last build (null = nothing assembled), for breakpoint marks
   const codeLines = result ? new Set(lineByAddress.values()) : null;
+
+  // Breakpoints panel: line, source text and the address Run stops at (first word of the line)
+  const addressByLine = new Map<number, number>();
+  for (const word of result?.words ?? []) {
+    if (word.address < MEMORY.PROGRAM_SIZE && !addressByLine.has(word.line)) {
+      addressByLine.set(word.line, word.address);
+    }
+  }
+  const sourceLines = code.split("\n");
+  const breakpointRows = [...breakpoints]
+    .sort((a, b) => a - b)
+    .map((line) => ({
+      line,
+      text: (sourceLines[line - 1] ?? "").trim(),
+      address: addressByLine.get(line) ?? null,
+    }));
 
   // Program address -> label name (first label if there are several), for the Stack panel
   const labelByAddress = new Map<number, string>();
@@ -592,15 +611,38 @@ function App() {
         <Panel title="Messages">
           <MessagesView result={result} outdated={outdated} onSelectLine={handleSelectLine} />
         </Panel>
-        <Panel title="History">
-          <HistoryView
-            rows={historyView.rows}
-            length={historyView.length}
-            capacity={HISTORY_SIZE}
-            onSelect={handleGoBack}
-            disabled={isRunning}
-          />
-        </Panel>
+        <TabbedPanel
+          selected={bottomTab}
+          onSelect={setBottomTab}
+          tabs={[
+            {
+              id: "history",
+              label: "History",
+              content: (
+                <HistoryView
+                  rows={historyView.rows}
+                  length={historyView.length}
+                  capacity={HISTORY_SIZE}
+                  onSelect={handleGoBack}
+                  disabled={isRunning}
+                />
+              ),
+            },
+            {
+              id: "breakpoints",
+              label: breakpoints.size > 0 ? `Breakpoints (${breakpoints.size})` : "Breakpoints",
+              content: (
+                <BreakpointsView
+                  rows={breakpointRows}
+                  outdated={outdated}
+                  onSelect={handleSelectLine}
+                  onRemove={handleToggleBreakpoint}
+                  onClearAll={() => setBreakpoints(new Set())}
+                />
+              ),
+            },
+          ]}
+        />
         <Panel title="EEPROM">
           {canSimulate ? (
             <MemoryView
