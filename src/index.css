@@ -1,10 +1,9 @@
 :root {
-  /* The three base colours. Light mode: ice background, obsidian text.
-     Dark mode flips them. Racing red is the accent in both.
-     (The previous blue/grey palette is in git: commit e606157.) */
+  /* Base colours. Light mode: ice background, obsidian text; dark mode flips them.
+     The accent is blue (racing red #ef233c was tried as the accent and dropped).
+     (The original blue/grey palette is in git: commit e606157.) */
   --obsidian: #111217;
   --ice: #dfe5eb;
-  --red: #ef233c;
 
   --text: color-mix(in srgb, var(--obsidian) 78%, var(--ice));
   --text-h: var(--obsidian);
@@ -12,11 +11,10 @@
   --panel-bg: color-mix(in srgb, var(--ice) 40%, white);
   --border: color-mix(in srgb, var(--obsidian) 20%, var(--ice));
   --code-bg: color-mix(in srgb, var(--ice) 65%, white);
-  --accent: var(--red);
-  --current-line: color-mix(in srgb, var(--red) 14%, transparent);
+  --accent: #2563eb;
+  --current-line: rgba(37, 99, 235, 0.14);
 
-  /* Status colours: kept apart from the accent so an error doesn't look like a highlight */
-  --error: #a50f24; /* darker crimson */
+  --error: #dc2626;
   --warning: #b45309;
   --success: #15803d;
 
@@ -39,9 +37,10 @@
     --border: color-mix(in srgb, var(--obsidian) 70%, var(--ice)); /* ~#4f5257 */
     /* ~#1d1f24: editor background and row hover, between the page and the panels */
     --code-bg: color-mix(in srgb, var(--obsidian) 94%, var(--ice));
-    --current-line: color-mix(in srgb, var(--red) 26%, transparent);
+    --accent: #60a5fa;
+    --current-line: rgba(96, 165, 250, 0.18);
 
-    --error: #ff7a8a; /* lighter rose: readable on obsidian, still unlike the accent */
+    --error: #f87171;
     --warning: #fbbf24;
     --success: #4ade80;
   }
