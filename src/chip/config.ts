@@ -58,3 +58,33 @@ export function decodeConfig(word: number): ConfigSettings {
     codeProtect: (word & 0x3ff0) !== 0x3ff0,
   };
 }
+
+// ---------- Oscillator modes and clock ranges ----------
+//
+// The FOSC bits set up the oscillator circuit for a range of frequencies
+// (datasheet section 6.2 and the electrical characteristics, PIC16F84A-20):
+//   LP  low-power crystal     up to 200 kHz (e.g. 32.768 kHz watch crystals)
+//   XT  crystal / resonator   100 kHz - 4 MHz
+//   HS  high-speed crystal    4 MHz - 20 MHz
+//   RC  resistor + capacitor  up to 4 MHz
+// Outside its range the oscillator may not start or run reliably on a real chip.
+
+const OSCILLATOR_RANGES: Record<Oscillator, { min: number; max: number }> = {
+  LP: { min: 0, max: 200_000 },
+  XT: { min: 100_000, max: 4_000_000 },
+  HS: { min: 4_000_000, max: 20_000_000 },
+  RC: { min: 0, max: 4_000_000 },
+};
+
+function formatHz(hz: number): string {
+  return hz >= 1_000_000 ? `${hz / 1_000_000} MHz` : `${hz / 1000} kHz`;
+}
+
+// Why the clock doesn't fit the configured oscillator mode, or null when it fits
+export function clockProblem(oscillator: Oscillator, hz: number): string | null {
+  const { min, max } = OSCILLATOR_RANGES[oscillator];
+  if (hz >= min && hz <= max) return null;
+  const fits = hz <= 200_000 ? "LP" : hz <= 4_000_000 ? "XT" : "HS";
+  const range = min === 0 ? `up to ${formatHz(max)}` : `${formatHz(min)} - ${formatHz(max)}`;
+  return `${oscillator} mode is for ${range}: use _${fits}_OSC in __CONFIG for ${formatHz(hz)}.`;
+}

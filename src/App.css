@@ -373,6 +373,26 @@ button:disabled {
   color: var(--warning);
 }
 
+/* Clock selector, pushed to the right end of the status bar */
+.status-clock {
+  margin-left: auto;
+  font-family: var(--sans);
+}
+
+.status-clock select {
+  font: inherit;
+  font-family: var(--mono);
+  padding: 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  color: var(--text-h);
+}
+
+.status-clock-warning {
+  color: var(--warning);
+}
+
 .status-note {
   font-family: var(--sans);
 }

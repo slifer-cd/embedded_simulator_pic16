@@ -8,9 +8,9 @@ A browser-based **PIC16F84A** assembler and simulator: a single-page app in Type
 
 - **Assembler** (MPASM-compatible syntax): two-pass, with `.hex` (INHX8M), `.lst` and `.err` downloads.
 - **Simulator**: all 35 instructions with pipeline-correct cycle counts, banked data memory, the 8-level stack, data EEPROM read/write, I/O pins, Timer0 (internal clock + prescaler, external clock on RA4/T0CKI), interrupts (TMR0, RB0/INT, RB4–RB7 change, EEPROM write complete), the watchdog, SLEEP wake-up and the power-on / MCLR / WDT reset types.
-- **UI**: editor with line numbers, Assemble / Run / Step / Reset (power-on) / MCLR, and panels for Messages, Flash, Registers, Stack, RAM, EEPROM and Pins.
+- **UI**: editor with line numbers, Assemble / Run / Step / Reset (power-on) / MCLR, a clock selector in the status bar, and panels for Messages, Flash, Registers, Stack, RAM, EEPROM and Pins.
 
-Not built yet: breakpoints, a clock selector (4 MHz is fixed), and the chip SVG (`components/ChipView.tsx` is an empty placeholder). `ideas.md` holds the approved feature list, the deferred EEPROM follow-ups and the planned order. `public/instructions.png` is the datasheet instruction table. `examples/` holds `.asm` programs for trying features by hand. `README.md` is still Vite template boilerplate.
+Not built yet: breakpoints and the chip SVG (`components/ChipView.tsx` is an empty placeholder). `ideas.md` holds the approved feature list, the deferred EEPROM follow-ups and the planned order. `public/instructions.png` is the datasheet instruction table. `examples/` holds `.asm` programs for trying features by hand. `README.md` is still Vite template boilerplate.
 
 ## Working agreement (set by the user)
 
@@ -66,6 +66,7 @@ MPASM behaviours that are easy to trip over:
 - **`peripherals/timer0.ts`:** `tick()` runs **after** the instruction, so the 2-cycle pause after a TMR0 write (`written()`, called from `Memory.write`) includes the writing instruction's own cycle; that matches datasheet Figure 5-2. The external clock checks the RA4 pin level once per instruction.
 - **`peripherals/portbInterrupts.ts`:** RB0/INT edges set INTF; RB7:RB4 input pins that differ from the levels stored at the last PORTB read set RBIF. `Memory.read` (instructions only, not `peek`) stores those levels.
 - **`peripherals/watchdog.ts`:** 18,000-cycle periods (18 ms at 4 MHz) times the postscaler when PSA = 1. After reset OPTION = 0xFF (1:128), so the default timeout is ~2.3 s. CLRWDT, SLEEP and resets clear it. The examples use `__CONFIG _WDT_OFF` because they never run CLRWDT.
+- **Clock:** `Memory.clockHz` (set with `Cpu.setClock`, not a property assignment: the React Compiler skips App if a `useState` value is mutated). Cycle counts don't depend on it; `cyclesFor(ms)` turns times fixed in ms (EEPROM write 4 ms, WDT period 18 ms) into cycles. `chip/config.ts` `clockProblem()` checks the clock against the `__CONFIG` oscillator mode.
 - **`snapshot()`:** copies the state for React. The `Cpu` object itself keeps changing.
 
 ### `App.tsx` state model

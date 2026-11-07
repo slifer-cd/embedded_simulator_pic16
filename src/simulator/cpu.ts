@@ -258,6 +258,15 @@ export class Cpu {
     };
   }
 
+  // Oscillator frequency (see Memory.clockHz). Changing it doesn't reset anything.
+  get clockHz(): number {
+    return this.memory.clockHz;
+  }
+
+  setClock(hz: number): void {
+    this.memory.clockHz = hz;
+  }
+
   // Something can end SLEEP (so Run should keep going while the CPU sleeps):
   // the watchdog, or an enabled INT / RB change / EEPROM interrupt
   get canWake(): boolean {

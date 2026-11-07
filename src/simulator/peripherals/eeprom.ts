@@ -26,8 +26,8 @@ const EECON1 = 0x88;
 
 const EEPROM_MASK = 0x3f; // 64 bytes: EEADR wraps
 
-// Write time: typical 4 ms. At 4 MHz one instruction cycle is 1 µs -> 4000 cycles.
-const WRITE_CYCLES = 4000;
+// Write time: typical 4 ms (4000 cycles at 4 MHz, 20,000 at 20 MHz)
+const WRITE_MS = 4;
 
 export class EepromController {
   private readonly memory: Memory;
@@ -87,7 +87,7 @@ export class EepromController {
         // Start the write: latch address and data now
         this.pendingAddress = this.memory.file[EEADR] & EEPROM_MASK;
         this.pendingData = this.memory.file[EEDATA];
-        this.cyclesLeft = WRITE_CYCLES;
+        this.cyclesLeft = this.memory.cyclesFor(WRITE_MS);
       } else {
         value &= ~(1 << WR); // not unlocked or WREN = 0: the write does not start
       }

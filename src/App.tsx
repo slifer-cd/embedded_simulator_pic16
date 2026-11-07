@@ -16,7 +16,7 @@ import { StatusBar } from "./components/StatusBar.tsx";
 import type { SimNote } from "./components/StatusBar.tsx";
 import { Toolbar } from "./components/Toolbar.tsx";
 import type { OutputFile } from "./components/Toolbar.tsx";
-import { MEMORY } from "./chip/config.ts";
+import { clockProblem, decodeConfig, MEMORY } from "./chip/config.ts";
 import { GPR_END, GPR_START } from "./chip/registers.ts";
 import { Cpu } from "./simulator/cpu.ts";
 import type { CpuSnapshot, StepResult } from "./simulator/cpu.ts";
@@ -41,7 +41,7 @@ loop    GOTO    loop
 
 const DEFAULT_FILE_NAME = "program"; // base name until a file is opened
 
-const CLOCK_HZ = 4_000_000; // oscillator frequency (4 MHz -> 1 µs per instruction cycle)
+const DEFAULT_CLOCK_HZ = 4_000_000; // oscillator frequency (4 MHz -> 1 µs per instruction cycle)
 const RUN_TICK_MS = 16; // how often the screen updates while running (~60 times a second)
 const STEPS_PER_TICK = 1000; // instructions executed between screen updates
 
@@ -110,6 +110,7 @@ function App() {
   const previousSim = snapshots?.before ?? null;
   const [running, setRunning] = useState(false);
   const [simNote, setSimNote] = useState<SimNote | null>(null); // last warning / info from the simulator
+  const [clockHz, setClockHz] = useState(DEFAULT_CLOCK_HZ); // oscillator frequency (also set in the CPU)
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
@@ -133,6 +134,11 @@ function App() {
 
   // Simulation needs a successful build of the current code
   const canSimulate = errorProblem === null && sim !== null;
+
+  // Clock outside the range of the oscillator mode chosen in __CONFIG (_XT_OSC etc.)
+  const clockWarning = result?.success
+    ? clockProblem(decodeConfig(result.config).oscillator, clockHz)
+    : null;
   const isRunning = running && canSimulate; // editing the code stops a running program
 
   // Program address -> source line, to highlight the next instruction in the editor
@@ -215,6 +221,12 @@ function App() {
     cpu.reset();
     setSnapshots({ now: cpu.snapshot(), before: null });
     setSimNote(null);
+  };
+
+  // A new clock: cycles stay the same, a cycle takes 4 / f. Running and the program are not touched.
+  const handleClockChange = (hz: number) => {
+    cpu.setClock(hz);
+    setClockHz(hz);
   };
 
   // MCLR pin pulled low: the chip restarts at 0x0000 but keeps RAM and the port latches.
@@ -311,7 +323,9 @@ function App() {
         sim={canSimulate ? sim : null}
         running={isRunning}
         note={simNote}
-        clockHz={CLOCK_HZ}
+        clockHz={clockHz}
+        onClockChange={handleClockChange}
+        clockWarning={clockWarning}
       />
 
       <main className="workspace">

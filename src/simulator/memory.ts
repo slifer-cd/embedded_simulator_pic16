@@ -79,6 +79,16 @@ export class Memory {
   readonly watchdog = new Watchdog(this); // WDT timeout (on/off from the config word)
   readonly pins = new Pins(); // external pin drives (the outside world)
 
+  // Oscillator frequency. One instruction cycle = 4 oscillator clocks, so at 4 MHz a cycle
+  // is 1 µs. Cycle counts don't depend on it; times fixed in ms on the chip do
+  // (EEPROM write, watchdog period): peripherals turn those into cycles with cyclesFor().
+  clockHz = 4_000_000;
+
+  // Instruction cycles in a time given in milliseconds, at the current clock (at least 1)
+  cyclesFor(ms: number): number {
+    return Math.max(1, Math.round((ms / 1000) * (this.clockHz / 4)));
+  }
+
   constructor() {
     this.program.fill(MEMORY.WORD_MASK); // blank flash = 0x3FFF
     this.eeprom.fill(0xff); // erased EEPROM = 0xFF

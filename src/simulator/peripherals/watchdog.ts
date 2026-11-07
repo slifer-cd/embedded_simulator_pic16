@@ -21,8 +21,9 @@ const OPTION_REG = 0x81;
 const PSA = 3;
 const PS_MASK = 0x07;
 
-// 18 ms at 4 MHz (1 µs per cycle). The clock selector (TODO #6) will compute this.
-const PERIOD_CYCLES = 18_000;
+// Nominal period without the postscaler (18,000 cycles at 4 MHz). The WDT has its own
+// RC oscillator, so the period is fixed in ms: in cycles it follows the clock.
+const PERIOD_MS = 18;
 
 export class Watchdog {
   private readonly memory: Memory;
@@ -45,7 +46,8 @@ export class Watchdog {
     if (!this.enabled) return Infinity;
     const option = this.memory.file[OPTION_REG];
     const ratio = (option >> PSA) & 1 ? 1 << (option & PS_MASK) : 1;
-    const left = (ratio - this.postscaler - 1) * PERIOD_CYCLES + (PERIOD_CYCLES - this.count);
+    const period = this.memory.cyclesFor(PERIOD_MS);
+    const left = (ratio - this.postscaler - 1) * period + (period - this.count);
     return Math.max(1, left); // PS made smaller while counting: times out at the next period
   }
 
@@ -53,8 +55,9 @@ export class Watchdog {
   tick(cycles: number): boolean {
     if (!this.enabled) return false;
     this.count += cycles;
-    if (this.count < PERIOD_CYCLES) return false;
-    this.count -= PERIOD_CYCLES;
+    const period = this.memory.cyclesFor(PERIOD_MS);
+    if (this.count < period) return false;
+    this.count -= period; // (after a clock change the rest is caught up on the next ticks)
 
     const option = this.memory.file[OPTION_REG];
     const ratio = (option >> PSA) & 1 ? 1 << (option & PS_MASK) : 1; // PS = 0 -> 1:1, 7 -> 1:128
